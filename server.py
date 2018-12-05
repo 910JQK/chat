@@ -5,11 +5,12 @@ import json
 import random
 import asyncio
 import websockets
+from functools import wraps
 from datetime import datetime
 from json.decoder import JSONDecodeError
 
 
-侦听端口 = 8012
+侦听端口 = 8102
 服务器名称 = '服务器'
 服务器 = 服务器名称
 随机名字长度 = 10
@@ -41,88 +42,153 @@ def 生成随机名字():
     return 名字
 
 
-def 后台执行(操作):
-    asyncio.create_task(操作)
-
-
 class 用户:
-    def __init__(self, socket):
+    
+    def __init__(self, socket, 名字):
         self.socket = socket
         self.登录时间 = now()
+        self.名字 = 名字
+    
     async def 发送消息(self, 消息):
         return await self.socket.send(json.dumps(消息, ensure_ascii=False))
+    
     async def 接收消息(self):
         字符串 = await self.socket.recv()
         try:
             return json.loads(字符串)
         except JSONDecodeError:
             return { '目标': 服务器, '内容': { '命令': '无' } }
+    
     async def 消息队列(self):
         while True:
             yield await self.接收消息()
 
 
+def 后台执行(操作):
+    asyncio.create_task(操作)
+
+
+def 广播消息(消息类型, 消息内容):
+    for 用户 in 用户列表.values():
+        后台执行(用户.发送消息({ '类型': 消息类型, '内容': 消息内容 }))
+    log(f'【{消息类型}】 {消息内容}')
+
+
 class 通知:
-    def 广播消息(消息内容):
-        for 用户 in 用户列表.values():
-            后台执行(用户.发送消息({ '类型': '通知', '内容': 消息内容 }))
+    发送 = lambda 内容: 广播消息('通知', 内容)
     def 新用户加入(名字):
-        通知.广播消息(f'用户 {名字} 加入了聊天')
+        通知.发送(f'用户 {名字} 加入了聊天')
     def 用户退出(名字):
-        通知.广播消息(f'用户 {名字} 退出了聊天')
+        通知.发送(f'用户 {名字} 退出了聊天')
     def 用户改名(旧名字, 新名字):
-        通知.广播消息(f'用户 {旧名字} 已改名为 {新名字}')
+        通知.发送(f'用户 {旧名字} 已改名为 {新名字}')
+
+
+def 封装消息(类型):
+    def decorator(f):
+        @wraps(f)
+        def g(*args, **kwargs):
+            消息内容 = f(*args, **kwargs)
+            return { '类型': 类型, '内容': 消息内容 }
+        return g
+    return decorator
+
+
+封装反馈消息 = 封装消息('反馈')
+
+
+class 反馈:
     
+    @封装反馈消息
+    def 欢迎消息(新用户):
+        return f'欢迎来到聊天室! 你现在的名字是 {新用户.名字}'
+    
+    class 改名:
+        @封装反馈消息
+        def 重名(新名字):
+            return f'名字 {新名字} 正在被其它人使用'
+        @封装反馈消息
+        def 不合法(新名字):
+            return f'名字 {新名字} 不合法'
+        @封装反馈消息
+        def 缺少名字():
+            return f'请输入新的名字'
+        @封装反馈消息
+        def 成功():
+            return f'名字更改成功'
+
+    class 说话:
+        @封装反馈消息
+        def 什么也没说():
+            return f'请输入说话内容'
+
+
+class 消息确认:
+    @封装消息('确认')
+    def 收到说话消息(序号):
+        return {'确认什么': '收到说话消息', '序号': 序号}
+
+
+class 其它消息:
+    @封装消息('用户列表')
+    def 用户列表():
+        return list(用户列表.keys())
+
+
+class 执行命令:
+    
+    async def 改名(用户, 新名字):
+        if 新名字:
+            if 用户列表.get(新名字):
+                await 用户.发送消息(反馈.改名.重名(新名字))
+            elif 新名字 in [服务器]:
+                await 用户.发送消息(反馈.改名.不合法(新名字))
+            else:
+                旧名字 = 用户.名字
+                用户列表[新名字] = 用户列表.pop(旧名字)
+                用户.名字 = 新名字
+                通知.用户改名(旧名字, 新名字)
+                await 用户.发送消息(反馈.改名.成功())
+        else:
+            await 用户.发送消息(反馈.改名.缺少名字())
+    
+    async def 说话(用户, 序号, 说了什么):
+        if 说了什么:
+            广播消息('说话', {'谁': 用户.名字, '说了什么': 说了什么})
+            await 用户.发送消息(消息确认.收到说话消息(序号))
+        else:
+            await 用户.发送消息(反馈.说话.什么也没说())
 
 
 def 登录用户(socket, 名字):
-    新用户 = 用户(socket)
+    新用户 = 用户(socket, 名字)
     用户列表[名字] = 新用户
     通知.新用户加入(名字)
     return 新用户
 
 
-def 注销用户(socket, 名字):
+def 注销用户(用户):
+    名字 = 用户.名字
     用户列表.pop(名字)
     通知.用户退出(名字)
 
 
 async def 柜台(socket, url):
-    def 发送(字符串):
-        return socket.send(字符串)
-    def 接收(字符串):
-        return socket.recv()
-    名字 = 生成随机名字()
-    用户 = 登录用户(socket, 名字)
-    欢迎消息 = f'欢迎来到聊天室! 你现在的名字是 {名字}'
-    log(f'用户 {名字} 加入了聊天室')
-    await 用户.发送消息({ '类型': '通知', '内容': 欢迎消息 })
+    用户 = 登录用户(socket, 生成随机名字())
+    await 用户.发送消息(反馈.欢迎消息(用户))
     try:
-        await 用户.发送消息({'类型':'用户列表', '内容':list(用户列表.keys()) })
+        await 用户.发送消息(其它消息.用户列表())
         async for 消息 in 用户.消息队列():
-            消息目标 = 消息.get('目标', 服务器)
-            消息内容 = 消息.get('内容', {})
-            if 消息目标 == 服务器:
-                命令 = 消息内容.get('命令', '')
-                if 命令 == '改名':
-                    新名字 = 消息内容.get('新名字', '')
-                    if 新名字:
-                        if 用户列表.get(新名字):
-                            重名 = f'名字 {新名字} 正在被其它人使用'
-                            await 用户.发送消息({ '类型':'通知', '内容':重名 })
-                        elif 新名字 == 服务器:
-                            不合法 = f'名字 {新名字} 不合法'
-                            await 用户.发送消息({'类型':'通知', '内容':不合法})
-                        else:
-                            用户列表[新名字] = 用户列表.pop(名字)
-                            旧名字 = 名字
-                            名字 = 新名字
-                            通知.用户改名(旧名字, 新名字)
-                    else:
-                        缺少名字 = '请提供新的名字'
-                        await 用户.发送消息({ '类型':'通知','内容': 缺少名字 })
+            命令 = 消息.get('命令', '')
+            if 命令 == '改名':
+                新名字 = 消息.get('新名字', '')
+                await 执行命令.改名(用户, 新名字)
+            elif 命令 == '说话':
+                说了什么 = 消息.get('说了什么', '')
+                序号 = 消息.get('序号', '0') or '0'
+                await 执行命令.说话(用户, 序号, 说了什么)
     finally:
-        注销用户(名字)
+        注销用户(用户)
 
 
 def 启动服务器():
