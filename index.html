@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; padding: 0; }
+      container { width: 100wv; height: 100vh; overflow: hidden; }
+      container { display: flex; flex-direction: column; }
+      top { flex-grow: 1; min-height: 0; }
+      bottom { flex-shrink: 0; height: 20%; }
+      top { display: flex; }
+      messages { flex-grow: 1; overflow: auto; }
+      right-area { flex-shrink: 0; width: 15%; }
+      bottom { display: flex; flex-direction: column; }
+      toolbar { flex-shrink: 0; }
+      inputarea { flex-grow: 1; }
+      inputarea > textarea { width: 100%; height: 100%; }
+      user-count, user-list { display: block; }
+    </style>
+    <style>
+      message { display: block; }
+      message > * { display: inline; }
+      user-item { display: block; }
+      recv-time { margin-right: 0.3em; }
+      say-name { margin-right: 0.4em;  }
+      say-name::after { content: ":" }
+      recv-time { display: inline-block; width: 4.7em; }
+    </style>
+    <script type="text/javascript" src="toolkit.js"></script>
+    <script type="text/javascript" src="chat.js"></script>
+  </head>
+  <body>
+    <container>
+      <top>
+        <messages id="消息列表视图">
+        </messages>
+        <right-area>
+          <user-count id="用户数量视图"></user-count>
+          <user-list id="用户列表视图"></user-list>
+        </right-area>
+      </top>
+      <bottom>
+        <toolbar>
+          <button id="改名按钮">改名</button>
+        </toolbar>
+        <inputarea>
+          <textarea id="输入框" placeholder="在这里输入文字"></textarea>
+        </inputarea>
+      </bottom>
+    </container>
+  </body>
+</html>
