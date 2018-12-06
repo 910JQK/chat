@@ -1,7 +1,8 @@
 const URL = 'ws://127.0.0.1:8102'
 
 
-var socket
+var socket = null
+var 名字 = ''
 
 
 function is_scrolled_to_bottom(view) {
@@ -21,7 +22,18 @@ function get_color(str) {
         t *= (10*code + u) % 1e10
         u += (10*code * t) % 1e10
     }
-    return `hsl(${(t+u) % 357}, ${70 + (t % 23)}%, ${25 + (u % 19)}%)`
+    return `hsl(${(t+u) % 353}, ${65 + (t % 23)}%, ${17 + (u % 19)}%)`
+}
+
+
+function 更新名字 (新名字) {
+    名字 = 新名字
+    名字提示.textContent = 新名字
+}
+
+
+function 是否提到自己 (字串) {
+    return 字串.split(' ').indexOf(`@${名字}`) != -1
 }
 
 
@@ -43,7 +55,10 @@ var 如何处理消息 = [
             let 颜色 = get_color(谁)
             渲染消息(create({
                 tag: 'message',
-                dataset: { 消息类型: 消息.类型 },
+                dataset: {
+                    消息类型: 消息.类型,
+                    是否高亮: 是否提到自己(说了什么)
+                },
                 children: [
                     { tag: 'recv-time', textContent: `(${消息.收到时间})`,
                       style: { color: 颜色 } },
@@ -78,6 +93,12 @@ var 如何处理消息 = [
                 tag: 'user-item',
                 textContent: 名字
             })))
+        }
+    },
+    {
+        类型: one_of('名字更新'),
+        执行动作: function (消息) {
+            更新名字(消息.内容)
         }
     }
 ]

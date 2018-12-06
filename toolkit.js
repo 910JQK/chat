@@ -79,7 +79,7 @@ function create (data) {
                 if ( field.has('initial') ) {
                     element[property][key] = initial
                 }
-            } else {
+            } else if ( data[property][key] !== null ) {
                 element[property][key] = data[property][key]
             }
         })
