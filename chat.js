@@ -14,6 +14,17 @@ function scroll_to_bottom(view) {
 }
 
 
+function get_color(str) {
+    let t = 1
+    let u = 0
+    for ( let code of map(str, c => c.codePointAt(0)) ) {
+        t *= (10*code + u) % 1e10
+        u += (10*code * t) % 1e10
+    }
+    return `hsl(${(t+u) % 357}, ${70 + (t % 23)}%, ${25 + (u % 19)}%)`
+}
+
+
 function 渲染消息 (消息视图) {
     let 滚动到最后 = is_scrolled_to_bottom(消息列表视图)    
     消息列表视图.appendChild(消息视图)
@@ -29,12 +40,15 @@ var 如何处理消息 = [
         执行动作: function (消息) {
             let 谁 = 消息.内容.谁
             let 说了什么 = 消息.内容.说了什么
+            let 颜色 = get_color(谁)
             渲染消息(create({
                 tag: 'message',
                 dataset: { 消息类型: 消息.类型 },
                 children: [
-                    { tag: 'recv-time', textContent: `(${消息.收到时间})` },
-                    { tag: 'say-name', textContent: 谁 },
+                    { tag: 'recv-time', textContent: `(${消息.收到时间})`,
+                      style: { color: 颜色 } },
+                    { tag: 'say-name', textContent: 谁,
+                      style: { color: 颜色 } },
                     { tag: 'say-content', textContent: 说了什么 }
                 ]
             }))
@@ -102,6 +116,7 @@ var handlers = {
         console.log('Disconnected')
     },
     message: function (ev) {
+        console.log(ev.data)
         处理消息(JSON.parse(ev.data))
     }
 }
