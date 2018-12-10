@@ -3,7 +3,9 @@ const URL = 'ws://127.0.0.1:8102'
 
 var socket = null
 var 名字 = ''
-var 加入频道表 = new Set()
+var 频道列表 = []
+var 用户列表 = {}
+var 已加入频道表 = new Set()
 var 当前频道 = ''
 
 
@@ -48,27 +50,33 @@ function 渲染消息 (消息视图) {
 }
 
 
+function 渲染用户列表 () {
+    列表 = 用户列表[当前频道]
+    用户数量视图.textContent = `当前 ${列表.length} 人在线`
+    clear(用户列表视图)
+    map(列表, 名字 => 用户列表视图.appendChild(create({
+        tag: 'user-item',
+        textContent: 名字
+    })))
+}
+
+
 var 如何处理消息 = [
     {
         类型: one_of('说话'),
         执行动作: function (消息) {
-            /* ---- */
             let 频道 = 消息.频道
-            /* ---- */
             let 谁 = 消息.内容.谁
             let 说了什么 = 消息.内容.说了什么
             let 颜色 = get_color(谁)
             渲染消息(create({
                 tag: 'message',
                 dataset: {
-                    消息类型: 消息.类型,
+                    频道: 频道,
+                    消息类型: '说话',
                     是否高亮: 是否提到自己(说了什么)
                 },
                 children: [
-                    /* ---- */
-                    { tag: 'debug-channel', textContent: `[${频道}]`,
-                      style: { color: 颜色 } },
-                    /* ---- */
                     { tag: 'recv-time', textContent: `(${消息.收到时间})`,
                       style: { color: 颜色 } },
                     { tag: 'say-name', textContent: 谁,
@@ -94,18 +102,11 @@ var 如何处理消息 = [
     {
         类型: one_of('用户列表'),
         执行动作: function (消息) {
-            /* ----- */
             let 频道 = 消息.频道
-            /* ----- */
-            let 用户列表 = 消息.内容
-            用户列表.sort()
-            用户数量视图.textContent = `${频道}: ${用户列表.length} 人`
-            //用户数量视图.textContent = `当前 ${用户列表.length} 人在线`
-            clear(用户列表视图)
-            map(用户列表, 名字 => 用户列表视图.appendChild(create({
-                tag: 'user-item',
-                textContent: 名字
-            })))
+            用户列表[频道] = 消息.内容.sort()
+            if ( 频道 == 当前频道 ) {
+                渲染用户列表()
+            }
         }
     },
     {
@@ -115,40 +116,38 @@ var 如何处理消息 = [
         }
     },
     {
-        类型: one_of('频道列表'),
-        执行动作: function (消息) {
-            let 列表 = 消息.内容            
-            渲染消息(create({
-                tag: 'message',
-                children: concat(
-                    [{ tag: 'msg-title', textContent: '频道列表:' }],
-                    map(列表, 频道 => ({
-                        tag: 'div',
-                        children: [
-                            { tag: 'c-name', textContent: `${频道.名称}` },
-                            { tag: 'span', textContent: ' - ' },
-                            { tag: 'c-topic', textContent: `${频道.主题}` }
-                        ]
-                    }))
-                )
-            }))
-        }
-    },
-    {
         类型: one_of('确认'),
         执行动作: function (消息) {
-            if ( 消息.内容.确认什么 == '成功加入频道' ) {
-                切换频道(消息.内容.频道)
-                渲染消息(create({
+            function 反馈消息视图 (文字) {
+                return create({
                     tag: 'message',
                     dataset: { 消息类型: '反馈' },
                     children: [
-                        { tag: 'recv-time', textContent: `(${消息.收到时间})` },
-                        { tag: 'info', textContent:
-                          `已加入 ${消息.内容.频道}: ${消息.内容.主题}` }
+                        { tag: 'recv-time',
+                          textContent: `(${消息.收到时间})` },
+                        { tag: 'info', textContent: 文字 }
                     ]
-                }))
+                })
             }
+            if ( 消息.内容.确认什么 == '成功加入频道' ) {
+                let 频道 = 消息.内容.频道
+                let 主题 = 消息.内容.主题
+                已加入频道表.add(频道)
+                切换频道(频道)
+                渲染消息(反馈消息视图(`已加入频道: ${频道} ~ ${主题}`))
+            } else if ( 消息.内容.确认什么 == '成功退出频道' ) {
+                let 频道 = 消息.内容.频道
+                已加入频道表.delete(频道)
+                let l = map(已加入频道表, x=>x)
+                let 退回频道 = l[l.length-1]
+                切换频道(退回频道 || '')
+            }
+        }
+    },
+    {
+        类型: one_of('频道列表'),
+        执行动作: function (消息) {
+            频道列表 = 消息.内容
         }
     }
 ]
@@ -171,7 +170,16 @@ function 发送消息 (消息) {
 
 function 切换频道 (频道) {
     当前频道 = 频道
-    频道提示.textContent = 当前频道
+    频道提示.textContent = 当前频道 || '---'
+    if (当前频道) {
+        退出按钮.href = 'javascript:void(0)'
+        inject_style('channel', create_style([
+            [[`message[data-频道="${当前频道}"]`], { display: 'block' }]
+        ]))
+    } else {
+        退出按钮.removeAttribute('href')
+        inject_style('channel', create_style([]))
+    }
 }
 
 
@@ -203,6 +211,7 @@ var handlers = {
 function init () {
     socket = new WebSocket(URL)
     map(handlers, (event, handler) => socket.addEventListener(event, handler))
+    切换频道('')
     输入框.addEventListener('keyup', function (ev) {
         if (ev.key == 'Enter') {
             let 说了什么 = 输入框.value.trimRight()
@@ -223,35 +232,51 @@ function init () {
             改名(新名字)
         }
     })
-    /* --- */
-    切换按钮.addEventListener('click', function (ev) {
-        let 频道 = prompt('请输入频道名称')
-        if (频道) {
-            切换频道(频道)
+    切换菜单 = popup_list(切换按钮, () => 已加入频道表, function (频道) {
+        return create({
+            tag: 'a',
+            href: (频道 == 当前频道)? null: 'javascript:void(0)',
+            textContent: 频道,
+            handlers: {
+                click: ev => 切换频道(频道)
+            }
+        })
+    })
+    切换按钮.addEventListener('click', function(ev) {
+        ev.stopPropagation()
+        切换菜单.toggle()
+    })
+    加入菜单 = popup_list(加入按钮, () => 频道列表, function (频道) {
+        if (!已加入频道表.has(频道.名称)) {
+            return create({
+                tag: 'a',
+                href: 'javascript:void(0)',
+                textContent: 频道.名称,
+                handlers: {
+                    click: ev => 发送消息(
+                        { 命令: '加入频道', 频道: 频道.名称 }
+                    )
+                }
+            })
         }
     })
-    /* --- */
     加入按钮.addEventListener('click', function (ev) {
-        let 频道 = prompt('请输入频道名称')
-        if (频道) {
-            发送消息({ 命令: '加入频道', 频道: 频道 })
-        }
+        ev.stopPropagation()
+        加入菜单.toggle()
     })
-    /* --- */
     退出按钮.addEventListener('click', function (ev) {
-        let 频道 = prompt('请输入频道名称')
-        if (频道) {
-            发送消息({ 命令: '退出频道', 频道: 频道 })
+        if (当前频道) {
+            发送消息({ 命令: '退出频道', 频道: 当前频道 })
         }
-    })
-    /* --- */
-    列表按钮.addEventListener('click', function (ev) {
-        发送消息({ 命令: '频道列表' })
     })
     创建按钮.addEventListener('click', function (ev) {
         let 频道名 = prompt('请输入频道名称')
-        let 主题 = prompt('请输入讨论主题')
-        发送消息({ 命令: '创建频道', 频道名: 频道名, 主题: 主题 })
+        if (频道名 !== null) {
+            let 主题 = prompt('请输入讨论主题')
+            if (主题 !== null) {
+                发送消息({ 命令: '创建频道', 频道名: 频道名, 主题: 主题 })
+            }
+        }
     })
 }
 

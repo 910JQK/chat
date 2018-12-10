@@ -21,7 +21,9 @@
     <style>
       body { font-family: sans-serif; font-size: 18px; }
       * { box-sizing: border-box; }
-      a { text-decoration: none; color: hsl(233, 85%, 50%); }
+      a { text-decoration: none; }
+      a[href] { color: hsl(233, 85%, 50%); }
+      a:not([href]) { color: hsl(0, 0%, 30%); }
       
       message { display: block; }
       message > *:not(div) { display: inline; }
@@ -40,6 +42,13 @@
 
       user-count { text-align: center; }
       inputarea > textarea { padding: 0.2em 0.3em; font-size: 130%; }
+    </style>
+    <style>
+      message[data-频道] { display: none; }
+
+      toolbar { position: relative; }
+      popup { display: block; position: absolute; }
+      popup-item { display: block; }
     </style>
     <script type="text/javascript" src="toolkit.js"></script>
     <script type="text/javascript" src="chat.js"></script>
@@ -62,7 +71,6 @@
           <a href="javascript:void(0)" id="切换按钮">切换频道</a>
           <a href="javascript:void(0)" id="加入按钮">加入频道</a>
           <a href="javascript:void(0)" id="退出按钮">退出频道</a>
-          <a href="javascript:void(0)" id="列表按钮">频道列表</a>
           <a href="javascript:void(0)" id="创建按钮">创建频道</a>
         </toolbar>
         <inputarea>

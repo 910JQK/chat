@@ -1,3 +1,13 @@
+function $ (selector) {
+    return document.querySelector(selector)
+}
+
+
+function $$ (selector) {
+    return document.querySelectorAll(selector)
+}
+
+
 function one_of(...str_list) {
     return new Set(str_list)
 }
@@ -107,7 +117,7 @@ function create (data) {
             if ( field.has('initial') ) {
                 element[property] = field.initial
             }
-        } else {
+        } else if (value !== null) {
             element[property] = value
         }
     })
@@ -140,6 +150,101 @@ function read (element, field_name) {
 function update (element, data) {
     map(element._fields, (key, field) => field.update.call(element, data[key]))
     map(element.children, child => update(child, data))
+}
+
+
+function create_style (rules) {
+    function normalize (name) {
+        return name.replace( /[A-Z]/, upper => '-' + upper.toLowerCase() )
+    }
+    return create({ tag: 'style', textContent: '\n' + join((function* () {
+        for ( let rule of rules ) {
+            let selectors = rule[0].join(', ')
+            let styles = join(map(
+	        rule[1],
+                (attr, value) => value? `${normalize(attr)}: ${value}; `: ''
+            ))
+	    yield styles? `${selectors} { ${styles}}\n`: ''
+        }
+    })()) })
+}
+
+
+function inject_style (name, style_tag) {
+    var now = $(`style.injected_style.${name}`)
+    if ( !now ) {
+        now = create({ tag: 'style', classList: ['injected_style', name] })
+        document.head.appendChild(now)
+    }
+    replace(now, style_tag)
+}
+
+
+function replace (now, new_element) {
+  for ( let className of now.classList ) {
+    new_element.classList.add(className)
+  }
+  now.parentNode.replaceChild(new_element, now)
+  return now
+}
+
+
+function join (iterable, separator = '') {
+  var str = ''
+  var it = iterable[Symbol.iterator]()
+  var a = it.next()
+  var b = it.next()
+  while ( !a.done ) {
+    str += a.value
+    if ( !b.done ) {
+      str += separator
+    }
+    a = b
+    b = it.next()
+  }
+  return str
+}
+
+
+function popup_list (pivot, get_list, f) {
+    function position () {
+        return {
+            bottom: `calc(${pivot.offsetTop + pivot.offsetHeight}px + 0.3em)`,
+            left: `${pivot.offsetLeft}px`
+        }
+    }
+    function gen_list() {
+        return map(get_list(), function (x) {
+            let y = f(x)
+            return create({
+                tag: 'popup-item',
+                children: typeof y != 'undefined'? [f(x)]: []
+            })
+        })
+    }
+    let ui = create({
+        tag: 'popup',
+        style: position(),
+        children: gen_list()
+    })
+    ui.style.display = 'none'
+    ui.update = function () {
+        clear(ui)
+        map(gen_list(), c => ui.appendChild(c))
+        map(position(), (k,v) => ui.style[k] = v)
+    }
+    ui.toggle = function () {
+        if (ui.style.display == 'none') {
+            ui.update()
+            map($$('popup'), x => x.style.display = 'none')
+            ui.style.display = ''
+        } else {
+            ui.style.display = 'none'
+        }
+    }
+    document.body.addEventListener('click', ev => ui.style.display = 'none')
+    pivot.parentElement.appendChild(ui)
+    return ui
 }
 
 
