@@ -4,6 +4,7 @@ import sys
 import json
 import random
 import asyncio
+import inspect
 import websockets
 from functools import wraps
 from datetime import datetime
@@ -11,12 +12,9 @@ from json.decoder import JSONDecodeError
 
 
 侦听端口 = 8102
-服务器名称 = '服务器'
-服务器 = 服务器名称
 随机名字长度 = 10
-
-
-用户列表 = {}
+默认频道 = '默认频道'
+默认频道主题 = 'default channel'
 
 
 def log(text):
@@ -42,12 +40,37 @@ def 生成随机名字():
     return 名字
 
 
+class 频道:
+
+    def __init__(self, 频道名, 主题):
+        self.频道名 = 频道名
+        self.主题 = 主题
+        self.加入用户列表 = set()
+
+    def 在里面(self, 用户):
+        return 用户.名字 in self.加入用户列表
+
+    def 不在里面(self, 用户):
+        return not self.在里面(用户)
+
+    def 加入用户(self, 用户):
+        self.加入用户列表.add(用户.名字)
+
+    def 移除用户(self, 用户):
+        self.加入用户列表.remove(用户.名字)
+
+    def 用户改名(self, 旧名字, 新名字):
+        self.加入用户列表.remove(旧名字)
+        self.加入用户列表.add(新名字)
+
+
 class 用户:
     
     def __init__(self, socket, 名字):
         self.socket = socket
         self.登录时间 = now()
         self.名字 = 名字
+        self.加入频道列表 = set()
     
     async def 发送消息(self, 消息):
         return await self.socket.send(json.dumps(消息, ensure_ascii=False))
@@ -63,15 +86,50 @@ class 用户:
         while True:
             yield await self.接收消息()
 
+    def 加入频道(self, 频道):
+        频道列表[频道].加入用户(self)
+        self.加入频道列表.add(频道)
+        广播(其它消息.用户列表(频道), 频道)
+        广播(通知.新用户加入(self), 频道)
+
+    def 退出频道(self, 频道):
+        频道列表[频道].移除用户(self)
+        self.加入频道列表.remove(频道)
+        广播(其它消息.用户列表(频道), 频道)
+        广播(通知.用户退出(self), 频道)
+
+    def 改名(self, 新名字):
+        旧名字 = self.名字
+        self.名字 = 新名字
+        for 频道 in self.加入频道列表:
+            频道列表[频道].用户改名(旧名字, 新名字)
+            广播(通知.用户改名(旧名字, 新名字), 频道)
+            广播(其它消息.用户列表(), 频道)
+
+    def 下线(self):
+        for 频道 in self.加入频道列表:
+            频道列表[频道].移除用户(self)
+            广播(其它消息.用户列表(频道), 频道)
+            广播(通知.用户下线(self), 频道)
+        self.加入频道列表 = set()
+        
+
+用户列表 = {}
+频道列表 = { 默认频道: 频道(默认频道, 默认频道主题) }
+
 
 def 后台执行(操作):
     asyncio.create_task(操作)
 
 
-def 广播(消息):
-    for 用户 in 用户列表.values():
-        后台执行(用户.发送消息(消息))
-    log(f"【{消息['类型']}】 {repr(消息['内容'])}")
+def 广播(消息, 频道=None):
+    if 频道 is not None:
+        for 用户 in [ 用户列表[名字] for 名字 in 频道列表[频道].加入用户列表]:
+            后台执行(用户.发送消息( {**消息, '频道': 频道} ))
+    else:
+        for 用户 in 用户列表.values():
+            后台执行(用户.发送消息(消息))
+    log(f"【{消息['类型']}】({频道}) {repr(消息['内容'])}")
 
 
 def 封装消息(类型):
@@ -88,6 +146,7 @@ def 封装消息(类型):
 通知消息 = 封装消息('通知')
 反馈消息 = 封装消息('反馈')
 确认消息 = 封装消息('确认')
+频道列表消息 = 封装消息('频道列表')
 用户列表消息 = 封装消息('用户列表')
 名字更新消息 = 封装消息('名字更新')
 
@@ -100,14 +159,17 @@ class 聊天:
 
 class 通知:
     @通知消息
-    def 新用户加入(名字):
-        return f'用户 {名字} 加入了聊天'
+    def 新用户加入(用户):
+        return f'用户 {用户.名字} 加入了聊天'
     @通知消息
-    def 用户退出(名字):
-        return f'用户 {名字} 退出了聊天'
+    def 用户退出(用户):
+        return f'用户 {用户.名字} 退出了聊天'
     @通知消息
     def 用户改名(旧名字, 新名字):
         return f'用户 {旧名字} 已改名为 {新名字}'
+    @通知消息
+    def 用户下线(用户):
+        return f'用户 {用户.名字} 已下线'
 
 
 class 反馈:
@@ -135,45 +197,105 @@ class 反馈:
         def 什么也没说():
             return f'请输入说话内容'
 
+    class 频道:
+        @反馈消息
+        def 已存在(频道):
+            return f'频道已存在: {频道} '
+        @反馈消息
+        def 不存在(频道):
+            return f'频道不存在: {频道}'
+        @反馈消息
+        def 已加入(频道):
+            return f'您已经加入了频道: {频道}'
+        @反馈消息
+        def 未加入(频道):
+            return f'您并未加入频道: {频道}'
+        @反馈消息
+        def 创建成功(频道):
+            return f'成功创建频道: {频道}'
+
 
 class 消息确认:
     @确认消息
     def 收到说话消息(序号):
         return {'确认什么': '收到说话消息', '序号': 序号}
+    @确认消息
+    def 加入成功(频道):
+        return {'确认什么': '成功加入频道', '频道': 频道}
+    @确认消息
+    def 退出成功(频道):
+        return {'确认什么': '成功退出频道', '频道': 频道}
+    @确认消息
+    def 创建成功(频道):
+        return {'确认什么': '成功创建频道', '频道': 频道}
 
 
 class 其它消息:
+    @频道列表消息
+    def 频道列表():
+        return [{'名称':c.频道名, '主题':c.主题} for c in 频道列表.values()]
     @用户列表消息
-    def 用户列表():
-        return list(用户列表.keys())
+    def 用户列表(频道):
+        return list(频道列表[频道].加入用户列表)
     @名字更新消息
-    def 名字更新(用户):
-        return 用户.名字
+    def 名字更新(新名字):
+        return 新名字    
 
 
 class 执行命令:
+
+    async def 频道列表(用户):
+        await 用户.发送消息(其它消息.频道列表())
+
+    async def 建立频道(用户, 频道名, 主题):
+        if 频道列表.get(频道名):
+            await 用户.发送消息(反馈.频道.已存在(频道名))
+            return
+        频道列表[频道名] = 频道(频道名, 主题)
+        await 用户.发送消息(消息确认.频道创建成功(频道名))
+        await 用户.发送消息(反馈.频道.创建成功(频道名))
+
+    async def 加入频道(用户, 频道):
+        if 频道列表.get(频道) is None:
+            await 用户.发送消息(反馈.频道.不存在(频道))
+            return
+        if 频道列表[频道].在里面(用户):
+            await 用户.发送消息(反馈.频道.已加入(频道))
+            return
+        用户.加入频道(频道)
+        await 用户.发送消息(消息确认.加入成功(频道))
+
+    async def 退出频道(用户, 频道):
+        if 频道列表.get(频道) is None:
+            await 用户.发送消息(反馈.频道.不存在(频道))
+            return
+        if 频道列表[频道].不在里面(用户):
+            await 用户.发送消息(反馈.频道.未加入(频道))
+            return
+        用户.退出频道(频道)
+        await 用户.发送消息(消息确认.退出成功(频道))
     
     async def 改名(用户, 新名字):
-        if 新名字:
-            if 用户列表.get(新名字):
-                await 用户.发送消息(反馈.改名.重名(新名字))
-            elif 新名字 in [服务器]:
-                await 用户.发送消息(反馈.改名.不合法(新名字))
-            else:
-                旧名字 = 用户.名字
-                用户列表[新名字] = 用户列表.pop(旧名字)
-                用户.名字 = 新名字
-                广播(通知.用户改名(旧名字, 新名字))
-                广播(其它消息.用户列表())
-                await 用户.发送消息(其它消息.名字更新(用户))
-                await 用户.发送消息(反馈.改名.成功())
-        else:
+        if 新名字 == '':
             await 用户.发送消息(反馈.改名.缺少名字())
+            return
+        if 用户列表.get(新名字):
+            await 用户.发送消息(反馈.改名.重名(新名字))
+            return
+        if 新名字.find(' ') != -1:
+            await 用户.发送消息(反馈.改名.不合法(新名字))
+            return
+        旧名字 = 用户.名字
+        用户.改名(新名字)
+        用户列表[新名字] = 用户列表.pop(旧名字)
+        await 用户.发送消息(其它消息.名字更新(新名字))
+        await 用户.发送消息(反馈.改名.成功())
     
-    async def 说话(用户, 序号, 说了什么):
+    async def 说话(用户, 频道, 序号, 说了什么):
         if 说了什么:
-            广播(聊天.说话(用户.名字, 说了什么))
-            await 用户.发送消息(消息确认.收到说话消息(序号))
+            if 频道列表.get(频道):
+                广播(聊天.说话(用户.名字, 说了什么), 频道)
+                await 用户.发送消息(消息确认.收到说话消息(序号))
         else:
             await 用户.发送消息(反馈.说话.什么也没说())
 
@@ -181,32 +303,29 @@ class 执行命令:
 def 登录用户(socket, 名字):
     新用户 = 用户(socket, 名字)
     用户列表[名字] = 新用户
-    广播(通知.新用户加入(名字))
-    广播(其它消息.用户列表())
     return 新用户
 
 
 def 注销用户(用户):
     名字 = 用户.名字
+    用户.下线()
     用户列表.pop(名字)
-    广播(通知.用户退出(名字))
-    广播(其它消息.用户列表())
 
 
 async def 柜台(socket, url):
     用户 = 登录用户(socket, 生成随机名字())
     await 用户.发送消息(反馈.欢迎消息(用户))
-    await 用户.发送消息(其它消息.名字更新(用户))
+    await 用户.发送消息(其它消息.名字更新(用户.名字))
     try:
-        async for 消息 in 用户.消息队列():
+        async for 消息 in 用户.消息队列():   
             命令 = 消息.get('命令', '')
-            if 命令 == '改名':
-                新名字 = 消息.get('新名字', '')
-                await 执行命令.改名(用户, 新名字)
-            elif 命令 == '说话':
-                说了什么 = 消息.get('说了什么', '')
-                序号 = 消息.get('序号', '0') or '0'
-                await 执行命令.说话(用户, 序号, 说了什么)
+            if hasattr(执行命令, 命令):
+                p = inspect.getfullargspec(getattr(执行命令, 命令)).args
+                argument = {}
+                for parameter in p:
+                    argument[parameter] = 消息.get(parameter, '')
+                argument['用户'] = 用户
+                await (getattr(执行命令, 命令))(**argument)
     finally:
         注销用户(用户)
 
