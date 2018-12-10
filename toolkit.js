@@ -56,6 +56,15 @@ function filter_key (hash, f) {
 }
 
 
+function *concat (...iterables) {
+    for( let iterable of iterables ) {
+	for ( let element of iterable ) {
+	    yield element	
+	}
+    }
+}
+
+
 function clear(element) {
     while ( element.firstChild ) {
         element.removeChild(element.firstChild)

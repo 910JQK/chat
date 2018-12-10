@@ -3,6 +3,8 @@ const URL = 'ws://127.0.0.1:8102'
 
 var socket = null
 var 名字 = ''
+var 加入频道表 = new Set()
+var 当前频道 = ''
 
 
 function is_scrolled_to_bottom(view) {
@@ -50,6 +52,9 @@ var 如何处理消息 = [
     {
         类型: one_of('说话'),
         执行动作: function (消息) {
+            /* ---- */
+            let 频道 = 消息.频道
+            /* ---- */
             let 谁 = 消息.内容.谁
             let 说了什么 = 消息.内容.说了什么
             let 颜色 = get_color(谁)
@@ -60,6 +65,10 @@ var 如何处理消息 = [
                     是否高亮: 是否提到自己(说了什么)
                 },
                 children: [
+                    /* ---- */
+                    { tag: 'debug-channel', textContent: `[${频道}]`,
+                      style: { color: 颜色 } },
+                    /* ---- */
                     { tag: 'recv-time', textContent: `(${消息.收到时间})`,
                       style: { color: 颜色 } },
                     { tag: 'say-name', textContent: 谁,
@@ -85,9 +94,13 @@ var 如何处理消息 = [
     {
         类型: one_of('用户列表'),
         执行动作: function (消息) {
+            /* ----- */
+            let 频道 = 消息.频道
+            /* ----- */
             let 用户列表 = 消息.内容
             用户列表.sort()
-            用户数量视图.textContent = `当前 ${用户列表.length} 人在线`
+            用户数量视图.textContent = `${频道}: ${用户列表.length} 人`
+            //用户数量视图.textContent = `当前 ${用户列表.length} 人在线`
             clear(用户列表视图)
             map(用户列表, 名字 => 用户列表视图.appendChild(create({
                 tag: 'user-item',
@@ -99,6 +112,43 @@ var 如何处理消息 = [
         类型: one_of('名字更新'),
         执行动作: function (消息) {
             更新名字(消息.内容)
+        }
+    },
+    {
+        类型: one_of('频道列表'),
+        执行动作: function (消息) {
+            let 列表 = 消息.内容            
+            渲染消息(create({
+                tag: 'message',
+                children: concat(
+                    [{ tag: 'msg-title', textContent: '频道列表:' }],
+                    map(列表, 频道 => ({
+                        tag: 'div',
+                        children: [
+                            { tag: 'c-name', textContent: `${频道.名称}` },
+                            { tag: 'span', textContent: ' - ' },
+                            { tag: 'c-topic', textContent: `${频道.主题}` }
+                        ]
+                    }))
+                )
+            }))
+        }
+    },
+    {
+        类型: one_of('确认'),
+        执行动作: function (消息) {
+            if ( 消息.内容.确认什么 == '成功加入频道' ) {
+                切换频道(消息.内容.频道)
+                渲染消息(create({
+                    tag: 'message',
+                    dataset: { 消息类型: '反馈' },
+                    children: [
+                        { tag: 'recv-time', textContent: `(${消息.收到时间})` },
+                        { tag: 'info', textContent:
+                          `已加入 ${消息.内容.频道}: ${消息.内容.主题}` }
+                    ]
+                }))
+            }
         }
     }
 ]
@@ -119,8 +169,15 @@ function 发送消息 (消息) {
 }
 
 
+function 切换频道 (频道) {
+    当前频道 = 频道
+    频道提示.textContent = 当前频道
+}
+
+
 function 说话 (说了什么) {
-    发送消息({ 命令: '说话', 说了什么: 说了什么 })
+    //发送消息({ 命令: '说话', 说了什么: 说了什么 })
+    发送消息({ 命令: '说话', 说了什么: 说了什么, 频道: 当前频道 })
 }
 
 
@@ -165,6 +222,36 @@ function init () {
         if (新名字 != null && 新名字 != '') {
             改名(新名字)
         }
+    })
+    /* --- */
+    切换按钮.addEventListener('click', function (ev) {
+        let 频道 = prompt('请输入频道名称')
+        if (频道) {
+            切换频道(频道)
+        }
+    })
+    /* --- */
+    加入按钮.addEventListener('click', function (ev) {
+        let 频道 = prompt('请输入频道名称')
+        if (频道) {
+            发送消息({ 命令: '加入频道', 频道: 频道 })
+        }
+    })
+    /* --- */
+    退出按钮.addEventListener('click', function (ev) {
+        let 频道 = prompt('请输入频道名称')
+        if (频道) {
+            发送消息({ 命令: '退出频道', 频道: 频道 })
+        }
+    })
+    /* --- */
+    列表按钮.addEventListener('click', function (ev) {
+        发送消息({ 命令: '频道列表' })
+    })
+    创建按钮.addEventListener('click', function (ev) {
+        let 频道名 = prompt('请输入频道名称')
+        let 主题 = prompt('请输入讨论主题')
+        发送消息({ 命令: '创建频道', 频道名: 频道名, 主题: 主题 })
     })
 }
 
