@@ -7,6 +7,7 @@ var 频道列表 = []
 var 用户列表 = {}
 var 已加入频道表 = new Set()
 var 当前频道 = ''
+var 滚动位置 = {}
 
 
 function is_scrolled_to_bottom(view) {
@@ -26,7 +27,7 @@ function get_color(str) {
         t *= (10*code + u) % 1e10
         u += (10*code * t) % 1e10
     }
-    return `hsl(${(t+u) % 353}, ${65 + (t % 23)}%, ${17 + (u % 19)}%)`
+    return `hsl(${(t+u) % 357}, ${58 + (t % 47)}%, ${23 + (u % 43)}%)`
 }
 
 
@@ -56,8 +57,15 @@ function 渲染用户列表 () {
     clear(用户列表视图)
     map(列表, 名字 => 用户列表视图.appendChild(create({
         tag: 'user-item',
+        style: { color: get_color(名字) },
         textContent: 名字
     })))
+}
+
+
+function 清空用户列表 () {
+    用户数量视图.textContent = ''
+    clear(用户列表视图)
 }
 
 
@@ -91,7 +99,10 @@ var 如何处理消息 = [
         执行动作: function (消息) {
             渲染消息(create({
                 tag: 'message',
-                dataset: { 消息类型: 消息.类型 },
+                dataset: {
+                    消息类型: 消息.类型,
+                    频道: 消息.频道? 消息.频道: null
+                },
                 children: [
                     { tag: 'recv-time', textContent: `(${消息.收到时间})` },
                     { tag: 'info', textContent: 消息.内容 }
@@ -141,6 +152,9 @@ var 如何处理消息 = [
                 let l = map(已加入频道表, x=>x)
                 let 退回频道 = l[l.length-1]
                 切换频道(退回频道 || '')
+                if (!退回频道) {
+                    scroll_to_bottom(消息列表视图)
+                }
             }
         }
     },
@@ -176,9 +190,19 @@ function 切换频道 (频道) {
         inject_style('channel', create_style([
             [[`message[data-频道="${当前频道}"]`], { display: 'block' }]
         ]))
+        渲染用户列表()
+        if ( 滚动位置[当前频道] ) {
+            let r = 滚动位置[当前频道]
+            if (r.滚到最后) {
+                scroll_to_bottom(消息列表视图)
+            } else {
+                消息列表视图.scrollTop = r.数值
+            }
+        }
     } else {
         退出按钮.removeAttribute('href')
         inject_style('channel', create_style([]))
+        清空用户列表()
     }
 }
 
@@ -212,6 +236,14 @@ function init () {
     socket = new WebSocket(URL)
     map(handlers, (event, handler) => socket.addEventListener(event, handler))
     切换频道('')
+    消息列表视图.addEventListener('scroll', function (ev) {
+        if ( 当前频道 ) {
+            滚动位置[当前频道] = {
+                数值: 消息列表视图.scrollTop,
+                滚到最后: is_scrolled_to_bottom(消息列表视图)
+            }
+        }
+    })
     输入框.addEventListener('keyup', function (ev) {
         if (ev.key == 'Enter') {
             let 说了什么 = 输入框.value.trimRight()
