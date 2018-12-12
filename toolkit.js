@@ -255,3 +255,16 @@ HTMLAnchorElement.prototype.disable = function () { this.removeAttribute('href')
 HTMLAnchorElement.prototype.is_enabled = function () { return this.hasAttribute('href') }
 HTMLTextAreaElement.prototype.enable = function () { this.disabled = false }
 HTMLTextAreaElement.prototype.disable = function () { this.disabled = true }
+HTMLTextAreaElement.prototype.insert = function (text) {
+    let start = this.selectionStart
+    let end = this.selectionEnd
+    let s = (a,b) => this.value.slice(a,b)
+    let len = this.value.length
+    let left = s(0, start)
+    left = left + ((left.endsWith(' ') || left == '')? '': ' ')
+    let right = s(end, len)
+    let ins = text + ((right.startsWith(' '))? '': ' ')
+    this.value = `${left}${ins}${right}`
+    this.selectionStart = this.selectionEnd = left.length + ins.length
+    this.focus()
+}

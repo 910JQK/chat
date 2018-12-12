@@ -12,12 +12,15 @@ toolbar { flex-shrink: 0; }
 inputarea { flex-grow: 1; }
 inputarea > textarea { width: 100%; height: 100%; }
 user-count, user-list { display: block; }
-messages { padding: 0.3em 0.4em; margin-right: 0.5em; }
-right-area { padding: 0.3em 0.4em; }
-bottom { padding: 0.3em 0.4em; }
-toolbar { padding: 0.2em 0.4em; }
-user-count { text-align: center; }
+messages { padding: 0.3em 0.4em; }
+messages > *:last-child { margin-bottom: 0.25em; }
+right-area { padding: 0.8em 0.6em; }
+bottom { padding: 0em 0.4em 0.3em 0.4em; }
+toolbar { padding: 0.4em 0.4em; }
 inputarea > textarea { padding: 0.2em 0.3em; }
+right-area { border-left: 1px solid hsl(0, 0%, 70%); }
+bottom { border-top: 1px solid hsl(0, 0%, 70%); }
+right-area { overflow: auto; }
 
 /* global */
 body { font-family: sans-serif; font-size: 18px; }
@@ -33,6 +36,7 @@ message > *:not(div) { display: inline; }
 user-item { display: block; }
 recv-time { margin-right: 0.3em; }
 say-name { margin-right: 0.4em;  }
+say-name { cursor: pointer; }
 say-name::after { content: ":" }
 message[data-消息类型=通知] { color: hsl(0, 0%, 15%) }
 message[data-消息类型=反馈] { font-weight: bold; }
@@ -41,6 +45,21 @@ message[data-频道] { display: none; }
 message:hover:not([data-是否高亮=true]) {
     background-color: hsla(0, 0%, 88%, 0.8);
 }
+message { cursor: default; }
+message info, message say-content { cursor: auto; }
+message > *:not(info):not(say-content):not(say-name) {
+    -moz-user-select: none; -webkit-user-select: none;
+}
+
+/* user list */
+user-count { text-align: center; }
+user-count { cursor: default; }
+user-count, user-list { -moz-user-select: none; -webkit-user-select: none; }
+user-count { margin-bottom: 0.5em; }
+user-item { padding: 0.3em 0.4em; }
+user-item { cursor: pointer; }
+user-item { font-weight: bold; }
+user-item:hover { background-color: hsla(0, 0%, 92%, 0.8); }
 
 /* toolbar & popup */
 toolbar { position: relative; }
@@ -54,14 +73,7 @@ item-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;  }
 popup { min-width: 8em; max-width: 10em; }
 popup { max-height: 35vh; overflow-y: auto; }
 
-/* appearance */
-message { cursor: default; }
-message info, message say-content, message say-name { cursor: auto; }
-message > *:not(info):not(say-content):not(say-name) {
-    -moz-user-select: none; -webkit-user-select: none;
-}
-user-count { cursor: default; }
-user-count { -moz-user-select: none; -webkit-user-select: none; }
+/* popup */
 popup-item a[href] { color: initial; }
 popup-item { font-size: 110%; }
 item-desc { color: hsl(0, 0%, 30%); font-size: 80%; }

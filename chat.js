@@ -8,30 +8,38 @@ var 用户列表 = {}
 var 已加入频道表 = new Set()
 var 当前频道 = ''
 var 滚动位置 = {}
+var 占有焦点 = true
 
 
-function is_scrolled_to_bottom(view) {
+function is_scrolled_to_bottom (view) {
     return view.scrollTop == (
         view.scrollTopMax || ( view.scrollHeight - view.offsetHeight )
     )
 }
 
 
-function scroll_to_bottom(view) {
+function scroll_to_bottom (view) {
     view.scrollTop = view.scrollTopMax || (
         view.scrollHeight - view.offsetHeight
     )
 }
 
 
-function get_color(str) {
+function get_color (str) {
     let t = 1
     let u = 0
     for ( let code of map(str, c => c.codePointAt(0)) ) {
         t *= (10*code + u) % 1e10
         u += (10*code * t) % 1e10
     }
-    return `hsl(${(t+u) % 357}, ${48 + (t % 43)}%, ${23 + (u % 33)}%)`
+    return `hsl(${(t+u) % 357}, ${41 + (t % 43)}%, ${13 + (u % 33)}%)`
+}
+
+
+function notify (title, content) {
+    if ( Notification && !占有焦点 ) {
+        new Notification(title, { body: content })
+    }
 }
 
 
@@ -62,6 +70,7 @@ function 渲染用户列表 () {
     map(列表, 名字 => 用户列表视图.appendChild(create({
         tag: 'user-item',
         style: { color: get_color(名字) },
+        handlers: { click: ev => 输入框.insert(`@${名字}`) },
         textContent: 名字
     })))
 }
@@ -81,21 +90,40 @@ var 如何处理消息 = [
             let 谁 = 消息.内容.谁
             let 说了什么 = 消息.内容.说了什么
             let 颜色 = get_color(谁)
+            let 被提到 = (谁 != 名字) && 是否提到自己(说了什么)
             渲染消息(create({
                 tag: 'message',
                 dataset: {
                     频道: 频道,
                     消息类型: '说话',
-                    是否高亮: 是否提到自己(说了什么)
+                    是否高亮: 被提到
                 },
                 children: [
                     { tag: 'recv-time', textContent: `(${消息.收到时间})`,
                       style: { color: 颜色 } },
                     { tag: 'say-name', textContent: 谁,
-                      style: { color: 颜色 } },
+                      style: { color: 颜色 },
+                      handlers: { click: ev => 输入框.insert(`@${谁}`) } },
                     { tag: 'say-content', textContent: 说了什么 }
                 ]
             }))
+            if (被提到) {
+                notify(`消息来自: ${频道}`, `${谁}: ${说了什么}`)
+            }
+            if (被提到 && 频道 != 当前频道) {
+                渲染消息(create({
+                    tag: 'message',
+                    dataset: {
+                        除去频道: 频道,
+                        消息类型: '通知',
+                        是否高亮: true
+                    },
+                    children: [
+                        { tag: 'recv-time', textContent: `(${消息.收到时间})` },
+                        { tag: 'info', textContent: `${谁} 在 ${频道} 提到了你` }
+                    ]
+                }))
+            }
         }
     },
     {
@@ -198,7 +226,8 @@ function 切换频道 (频道) {
     if (当前频道) {
         退出按钮.enable()
         inject_style('channel', create_style([
-            [[`message[data-频道="${当前频道}"]`], { display: 'block' }]
+            [[`message[data-频道="${当前频道}"]`], { display: 'block' }],
+            [[`message[data-除去频道="${当前频道}"]`], { display: 'none' }]
         ]))
         渲染用户列表()
         if ( 滚动位置[当前频道] ) {
@@ -216,9 +245,7 @@ function 切换频道 (频道) {
         切换按钮.disable()
         退出按钮.disable()
         输入框.disable()
-        inject_style('channel', create_style([
-            [[`message[data-频道="${当前频道}"]`], { display: 'block' }]
-        ]))
+        inject_style('channel', create_style([]))
         清空用户列表()
     }
 }
@@ -253,6 +280,13 @@ function init () {
     socket = new WebSocket(URL)
     map(handlers, (event, handler) => socket.addEventListener(event, handler))
     切换频道('')
+    if ( Notification ) {
+        Notification.requestPermission().then(function(result) {
+            console.log(result);
+        });
+    }
+    window.addEventListener('focus', ev => 占有焦点 = true)
+    window.addEventListener('blur', ev => 占有焦点 = false)
     消息列表视图.addEventListener('scroll', function (ev) {
         if ( 当前频道 ) {
             滚动位置[当前频道] = {
@@ -261,6 +295,7 @@ function init () {
             }
         }
     })
+    输入框.value = ''
     输入框.addEventListener('keyup', function (ev) {
         if (ev.key == 'Enter') {
             let 说了什么 = 输入框.value.trimRight()
