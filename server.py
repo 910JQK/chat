@@ -364,7 +364,7 @@ async def 柜台(socket, url):
 def 启动服务器():
     事件循环 = asyncio.get_event_loop()
     事件循环.run_until_complete(
-        websockets.serve(柜台, '127.0.0.1', 侦听端口, max_size=3*1024*1024)
+        websockets.serve(柜台, '127.0.0.1', 侦听端口, max_size=9*1024*1024)
     )
     事件循环.run_forever()
 
