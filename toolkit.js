@@ -249,7 +249,46 @@ function popup_list (pivot, get_list, f) {
 }
 
 
+function encode(buf) {
+    //  return String.fromCharCode.apply(null, new Uint16Array(buf))
+    
+    let array = new Uint8Array(buf)
+    let str = ''
+    for (var i=0; i<array.length; i++){
+        str += String.fromCharCode(array[i]);
+    }
+    return str
+    
+    //return String.fromCharCode.apply(null, new Uint8Array(buf))
+}
+
+
+function decode(str) {
+    /*
+    var buf = new ArrayBuffer(str.length*2)
+    var view = new Uint16Array(buf)
+    for (var i=0; i<str.length; i++) {
+        view[i] = str.charCodeAt(i)
+    }
+    return buf
+    */
+    let array = new Uint8Array(str.length);
+    for (var i=0; i<str.length; i++){
+        array[i] = str.charCodeAt(i);
+    }
+    return array
+}
+
+
 Object.prototype.has = function (key) { return this.hasOwnProperty(key) }
+HTMLElement.prototype.hide = function () { this.style.display = 'none' }
+HTMLElement.prototype.toggle = function () {
+    if ( this.style.display == 'none' ) {
+        this.style.display = ''
+    } else {
+        this.style.display = 'none'
+    }
+}
 HTMLAnchorElement.prototype.enable = function () { this.href = 'javascript:void(0)'; return true }
 HTMLAnchorElement.prototype.disable = function () { this.removeAttribute('href'); return true }
 HTMLAnchorElement.prototype.is_enabled = function () { return this.hasAttribute('href') }

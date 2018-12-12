@@ -1,4 +1,4 @@
-const URL = 'ws://127.0.0.1:8102'
+const WS_URL = 'ws://127.0.0.1:8102'
 
 
 var socket = null
@@ -9,6 +9,7 @@ var 已加入频道表 = new Set()
 var 当前频道 = ''
 var 滚动位置 = {}
 var 占有焦点 = true
+var 图片大小上限 = 3*1024*1024
 
 
 function is_scrolled_to_bottom (view) {
@@ -38,7 +39,7 @@ function get_color (str) {
 
 function notify (title, content) {
     if ( Notification && !占有焦点 ) {
-        new Notification(title, { body: content })
+        new Notification(title, { body: content, icon: 'chat.png' })
     }
 }
 
@@ -108,7 +109,7 @@ var 如何处理消息 = [
                 ]
             }))
             if (被提到) {
-                notify(`消息来自: ${频道}`, `${谁}: ${说了什么}`)
+                notify(`${频道}`, `${谁}: ${说了什么}`)
             }
             if (被提到 && 频道 != 当前频道) {
                 渲染消息(create({
@@ -124,6 +125,39 @@ var 如何处理消息 = [
                     ]
                 }))
             }
+        }
+    },
+    {
+        类型: one_of('发图'),
+        执行动作: function (消息) {
+            let 频道 = 消息.频道
+            let 发图用户 = 消息.内容.谁
+            let 图片 = 消息.内容.发了什么
+            let 格式 = 消息.内容.什么格式
+            let 颜色 = get_color(发图用户)
+            let 图片地址 = URL.createObjectURL(
+                new Blob([decode(图片)], {type: 'image/${格式}'})
+            )
+            console.log(图片地址)
+            渲染消息(create({
+                tag: 'message',
+                dataset: {
+                    频道: 频道,
+                    消息类型: '发图'
+                },
+                children: [
+                    { tag: 'recv-time', textContent: `(${消息.收到时间})`,
+                      style: { color: 颜色 } },
+                    { tag: 'say-name', textContent: 发图用户,
+                      style: { color: 颜色 },
+                      handlers: { click: ev => 输入框.insert(`@${发图用户}`) }},
+                    { tag: 'img', src: 图片地址, classList: ['image'],
+                      handlers: { load: (频道 == 当前频道)
+                                  && is_scrolled_to_bottom(消息列表视图)
+                                  && (ev => scroll_to_bottom(消息列表视图))
+                                  || (ev => 0) } }
+                ]
+            }))
         }
     },
     {
@@ -225,6 +259,8 @@ function 切换频道 (频道) {
     频道提示.textContent = 当前频道 || '---'
     if (当前频道) {
         退出按钮.enable()
+        选图按钮.enable()
+        输入框.enable()
         inject_style('channel', create_style([
             [[`message[data-频道="${当前频道}"]`], { display: 'block' }],
             [[`message[data-除去频道="${当前频道}"]`], { display: 'none' }]
@@ -240,10 +276,10 @@ function 切换频道 (频道) {
         } else {
             scroll_to_bottom(消息列表视图)
         }
-        输入框.enable()
     } else {
         切换按钮.disable()
         退出按钮.disable()
+        选图按钮.disable()
         输入框.disable()
         inject_style('channel', create_style([]))
         清空用户列表()
@@ -252,8 +288,12 @@ function 切换频道 (频道) {
 
 
 function 说话 (说了什么) {
-    //发送消息({ 命令: '说话', 说了什么: 说了什么 })
     发送消息({ 命令: '说话', 说了什么: 说了什么, 频道: 当前频道 })
+}
+
+
+function 发图 (数据, 格式) {
+    发送消息({ 命令: '发图', 图片: 数据, 格式: 格式, 频道: 当前频道 })
 }
 
 
@@ -277,7 +317,7 @@ var handlers = {
 
 
 function init () {
-    socket = new WebSocket(URL)
+    socket = new WebSocket(WS_URL)
     map(handlers, (event, handler) => socket.addEventListener(event, handler))
     切换频道('')
     if ( Notification ) {
@@ -318,6 +358,43 @@ function init () {
             }
         }
     })
+    选图按钮.addEventListener('click', ev => 选图对话框.toggle())
+    取消选图按钮.addEventListener('click', ev => 选图对话框.hide());
+    (function () {
+        function feedback (text) {
+            选图提示.textContent = text
+        }
+        let 图片数据 = ''
+        let 文件格式 = 'png'
+        文件输入.addEventListener('change', function (ev) {
+            let f = 文件输入.files[0]
+            文件格式 = f.name.replace(/.*\.(...)$/,'$1').toLowerCase()
+            let reader = new FileReader()
+            reader.addEventListener('load', function (ev) {
+                let data = ev.target.result
+                //if (2*data.length >= 图片大小上限) {
+                if (data.byteLength >= 图片大小上限) {
+                    feedback('文件过大, 请重新选择')
+                } else {
+                    feedback('图片加载成功, 点击发送键发送')
+                    //图片数据 = data
+                    图片数据 = encode(data)
+                    发图按钮.disabled = false
+                }
+            });
+            //reader.readAsBinaryString(f)
+            reader.readAsArrayBuffer(f)
+            feedback('正在加载图片...')
+            发图按钮.disabled = true
+        })
+        发图按钮.addEventListener('click', function (ev) {
+            发图按钮.disabled = true
+            文件输入.value = ''
+            选图对话框.hide()
+            feedback('请选择要发送的图片, 最大 3M')
+            发图(图片数据, 文件格式)
+        })
+    })()
     切换菜单 = popup_list(切换按钮, () => 已加入频道表, function (频道) {
         return create({
             tag: 'a',
