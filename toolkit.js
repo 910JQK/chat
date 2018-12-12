@@ -214,13 +214,14 @@ function popup_list (pivot, get_list, f) {
         }
     }
     function gen_list() {
-        return map(get_list(), function (x) {
+        return filter(map(get_list(), function (x) {
             let y = f(x)
-            return create({
+            return (typeof y != 'undefined')? create({
                 tag: 'popup-item',
-                children: typeof y != 'undefined'? [f(x)]: []
-            })
-        })
+                dataset: y.data_item || {},
+                children: [y]
+            }) : null
+        }), e => e !== null)
     }
     let ui = create({
         tag: 'popup',
@@ -249,3 +250,8 @@ function popup_list (pivot, get_list, f) {
 
 
 Object.prototype.has = function (key) { return this.hasOwnProperty(key) }
+HTMLAnchorElement.prototype.enable = function () { this.href = 'javascript:void(0)'; return true }
+HTMLAnchorElement.prototype.disable = function () { this.removeAttribute('href'); return true }
+HTMLAnchorElement.prototype.is_enabled = function () { return this.hasAttribute('href') }
+HTMLTextAreaElement.prototype.enable = function () { this.disabled = false }
+HTMLTextAreaElement.prototype.disable = function () { this.disabled = true }

@@ -11,12 +11,16 @@ var 滚动位置 = {}
 
 
 function is_scrolled_to_bottom(view) {
-    return view.scrollTop == view.scrollTopMax
+    return view.scrollTop == (
+        view.scrollTopMax || ( view.scrollHeight - view.offsetHeight )
+    )
 }
 
 
 function scroll_to_bottom(view) {
-    return view.scrollTop = view.scrollTopMax
+    view.scrollTop = view.scrollTopMax || (
+        view.scrollHeight - view.offsetHeight
+    )
 }
 
 
@@ -27,7 +31,7 @@ function get_color(str) {
         t *= (10*code + u) % 1e10
         u += (10*code * t) % 1e10
     }
-    return `hsl(${(t+u) % 357}, ${58 + (t % 47)}%, ${23 + (u % 43)}%)`
+    return `hsl(${(t+u) % 357}, ${48 + (t % 43)}%, ${23 + (u % 33)}%)`
 }
 
 
@@ -144,17 +148,22 @@ var 如何处理消息 = [
                 let 频道 = 消息.内容.频道
                 let 主题 = 消息.内容.主题
                 已加入频道表.add(频道)
+                用户列表[频道] = 消息.内容.用户列表.sort()
+                切换按钮.enable()
+                加入按钮.更新状态()
                 切换频道(频道)
                 渲染消息(反馈消息视图(`已加入频道: ${频道} ~ ${主题}`))
             } else if ( 消息.内容.确认什么 == '成功退出频道' ) {
                 let 频道 = 消息.内容.频道
                 已加入频道表.delete(频道)
+                加入按钮.更新状态()
                 let l = map(已加入频道表, x=>x)
                 let 退回频道 = l[l.length-1]
                 切换频道(退回频道 || '')
                 if (!退回频道) {
                     scroll_to_bottom(消息列表视图)
                 }
+                渲染消息(反馈消息视图(`已退出频道: ${频道}`))
             }
         }
     },
@@ -162,6 +171,7 @@ var 如何处理消息 = [
         类型: one_of('频道列表'),
         执行动作: function (消息) {
             频道列表 = 消息.内容
+            加入按钮.更新状态()
         }
     }
 ]
@@ -186,7 +196,7 @@ function 切换频道 (频道) {
     当前频道 = 频道
     频道提示.textContent = 当前频道 || '---'
     if (当前频道) {
-        退出按钮.href = 'javascript:void(0)'
+        退出按钮.enable()
         inject_style('channel', create_style([
             [[`message[data-频道="${当前频道}"]`], { display: 'block' }]
         ]))
@@ -198,10 +208,17 @@ function 切换频道 (频道) {
             } else {
                 消息列表视图.scrollTop = r.数值
             }
+        } else {
+            scroll_to_bottom(消息列表视图)
         }
+        输入框.enable()
     } else {
-        退出按钮.removeAttribute('href')
-        inject_style('channel', create_style([]))
+        切换按钮.disable()
+        退出按钮.disable()
+        输入框.disable()
+        inject_style('channel', create_style([
+            [[`message[data-频道="${当前频道}"]`], { display: 'block' }]
+        ]))
         清空用户列表()
     }
 }
@@ -259,54 +276,74 @@ function init () {
         }
     })
     改名按钮.addEventListener('click', function (ev) {
-        let 新名字 = prompt('请输入新的名字')
-        if (新名字 != null && 新名字 != '') {
-            改名(新名字)
+        if (this.is_enabled()) {
+            let 新名字 = prompt('请输入新的名字')
+            if (新名字 != null && 新名字 != '') {
+                改名(新名字)
+            }
         }
     })
     切换菜单 = popup_list(切换按钮, () => 已加入频道表, function (频道) {
         return create({
             tag: 'a',
             href: (频道 == 当前频道)? null: 'javascript:void(0)',
+            data_item: { enabled: (频道 != 当前频道) },
             textContent: 频道,
             handlers: {
-                click: ev => 切换频道(频道)
+                click: ev => (频道 != 当前频道) && 切换频道(频道)
             }
         })
     })
     切换按钮.addEventListener('click', function(ev) {
-        ev.stopPropagation()
-        切换菜单.toggle()
+        if (this.is_enabled()) {
+            ev.stopPropagation()
+            切换菜单.toggle()
+        }
     })
     加入菜单 = popup_list(加入按钮, () => 频道列表, function (频道) {
         if (!已加入频道表.has(频道.名称)) {
             return create({
                 tag: 'a',
                 href: 'javascript:void(0)',
-                textContent: 频道.名称,
                 handlers: {
                     click: ev => 发送消息(
                         { 命令: '加入频道', 频道: 频道.名称 }
                     )
-                }
+                },
+                children: [
+                    { tag: 'item-label', textContent: 频道.名称 },
+                    { tag: 'item-desc', textContent: 频道.主题 }
+                ]
             })
         }
     })
     加入按钮.addEventListener('click', function (ev) {
-        ev.stopPropagation()
-        加入菜单.toggle()
+        if (this.is_enabled()) {
+            ev.stopPropagation()
+            加入菜单.toggle()
+        }
     })
+    加入按钮.更新状态 = function () {
+        filter(
+            map(频道列表, c => c.名称),
+            名称 => !(已加入频道表.has(名称))
+        ).length > 0 && 加入按钮.enable() || 加入按钮.disable()        
+    }
     退出按钮.addEventListener('click', function (ev) {
-        if (当前频道) {
-            发送消息({ 命令: '退出频道', 频道: 当前频道 })
+        if (this.is_enabled()) {
+            if (当前频道) {
+                发送消息({ 命令: '退出频道', 频道: 当前频道 })
+            }
         }
     })
     创建按钮.addEventListener('click', function (ev) {
-        let 频道名 = prompt('请输入频道名称')
-        if (频道名 !== null) {
-            let 主题 = prompt('请输入讨论主题')
-            if (主题 !== null) {
-                发送消息({ 命令: '创建频道', 频道名: 频道名, 主题: 主题 })
+        if (this.is_enabled()) {         
+            let 频道名 = prompt('请输入频道名称')
+            if (频道名 !== null) {
+                let 主题 = prompt('请输入讨论主题')
+                if (主题 !== null) {
+                    发送消息({ 命令: '创建频道', 频道名: 频道名, 主题: 主题 })
+                }
             }
         }
     })

@@ -1,0 +1,84 @@
+/* layout */
+body { margin: 0; padding: 0; }
+container { width: 100wv; height: 100vh; overflow: hidden; }
+container { display: flex; flex-direction: column; }
+top { flex-grow: 1; min-height: 0; }
+bottom { flex-shrink: 0; height: 20%; }
+top { display: flex; }
+messages { flex-grow: 1; overflow: auto; }
+right-area { flex-shrink: 0; width: 12em; }
+bottom { display: flex; flex-direction: column; }
+toolbar { flex-shrink: 0; }
+inputarea { flex-grow: 1; }
+inputarea > textarea { width: 100%; height: 100%; }
+user-count, user-list { display: block; }
+messages { padding: 0.3em 0.4em; margin-right: 0.5em; }
+right-area { padding: 0.3em 0.4em; }
+bottom { padding: 0.3em 0.4em; }
+toolbar { padding: 0.2em 0.4em; }
+user-count { text-align: center; }
+inputarea > textarea { padding: 0.2em 0.3em; }
+
+/* global */
+body { font-family: sans-serif; font-size: 18px; }
+* { box-sizing: border-box; }
+a { text-decoration: none; }
+a[href] { color: hsl(233, 85%, 50%); }
+a:not([href]) { color: hsl(0, 0%, 35%); cursor: default; }
+textarea { font-size: 130%; }
+
+/* message */
+message { display: block; }
+message > *:not(div) { display: inline; }
+user-item { display: block; }
+recv-time { margin-right: 0.3em; }
+say-name { margin-right: 0.4em;  }
+say-name::after { content: ":" }
+message[data-消息类型=通知] { color: hsl(0, 0%, 15%) }
+message[data-消息类型=反馈] { font-weight: bold; }
+message[data-是否高亮=true] { background-color: hsl(60, 88%, 77%); }
+message[data-频道] { display: none; }
+message:hover:not([data-是否高亮=true]) {
+    background-color: hsla(0, 0%, 88%, 0.8);
+}
+
+/* toolbar & popup */
+toolbar { position: relative; }
+toolbar { -moz-user-select: none; -webkit-user-select: none; }
+popup { display: block; position: absolute; }
+popup-item { display: block; }
+popup-item > a { display: block; }
+item-title { display: block; }
+item-desc { display: block; }
+item-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;  }
+popup { min-width: 8em; max-width: 10em; }
+popup { max-height: 35vh; overflow-y: auto; }
+
+/* appearance */
+message { cursor: default; }
+message info, message say-content, message say-name { cursor: auto; }
+message > *:not(info):not(say-content):not(say-name) {
+    -moz-user-select: none; -webkit-user-select: none;
+}
+user-count { cursor: default; }
+user-count { -moz-user-select: none; -webkit-user-select: none; }
+popup-item a[href] { color: initial; }
+popup-item { font-size: 110%; }
+item-desc { color: hsl(0, 0%, 30%); font-size: 80%; }
+popup {
+    border: 1px solid hsl(0, 0%, 70%);
+    box-shadow: 0 3px 9px hsla(0, 0%, 40%, 0.4);
+    background: linear-gradient(to bottom, hsl(0, 0%, 94%), hsl(0, 0%,95%)); 
+}
+popup-item > a { padding: 0.2em 0.5em; }
+popup-item > a { display: block; }
+popup-item:not(:last-child) { border-bottom: 1px solid hsl(0, 0%, 78%); }
+popup-item:hover:not([data-enabled=false]) {
+    background-color: hsl(0, 0%, 83%);
+}
+popup-item[data-enabled] > a::before {
+    content: "　";
+}
+popup-item[data-enabled=false] > a::before {
+    content: "・";
+}
