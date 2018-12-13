@@ -289,6 +289,8 @@ HTMLElement.prototype.toggle = function () {
         this.style.display = 'none'
     }
 }
+HTMLButtonElement.prototype.enable = function () { this.disabled = false }
+HTMLButtonElement.prototype.disable = function () { this.disabled = true }
 HTMLAnchorElement.prototype.enable = function () { this.href = 'javascript:void(0)'; return true }
 HTMLAnchorElement.prototype.disable = function () { this.removeAttribute('href'); return true }
 HTMLAnchorElement.prototype.is_enabled = function () { return this.hasAttribute('href') }

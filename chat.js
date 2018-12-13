@@ -1,6 +1,8 @@
-const WS_URL = 'ws://127.0.0.1:8102'
+const DEFAULT_URL = 'ws://127.0.0.1:8102'
+const 图片大小上限 = 3*1024*1024
 
 
+var ws_url = ''
 var socket = null
 var 名字 = ''
 var 频道列表 = []
@@ -9,7 +11,6 @@ var 已加入频道表 = new Set()
 var 当前频道 = ''
 var 滚动位置 = {}
 var 占有焦点 = true
-const 图片大小上限 = 3*1024*1024
 
 
 function is_scrolled_to_bottom (view) {
@@ -308,15 +309,36 @@ function 加入频道 (频道) {
 
 
 function 发起连接() {
-    socket = new WebSocket(WS_URL)
+    socket = new WebSocket(ws_url)
     map(handlers, (event, handler) => socket.addEventListener(event, handler))
+}
+
+
+var set_ui = {
+    disconnected: function () {
+        切换按钮.disable()
+        改名按钮.disable()
+        创建按钮.disable()
+        选图按钮.disable()
+        退出按钮.disable()
+        加入按钮.disable()        
+    },
+    connected: function () {
+        切换按钮.disable()
+        改名按钮.enable()
+        创建按钮.enable()
+        选图按钮.enable()
+        退出按钮.enable()
+        加入按钮.更新状态()
+    }
 }
 
 
 var handlers = {
     open: function (ev) {
         console.log('Connected')
-        if (名字) {
+        let 已有连接 = (名字 != '')
+        if (已有连接) {
             改名(名字)
             map(
                 filter(已加入频道表, 频道 => 频道 != 当前频道),
@@ -326,8 +348,10 @@ var handlers = {
                 加入频道(当前频道)
             }
             已加入频道表.clear()
-            切换按钮.disable()
+        } else {
+            连接对话框.hide()
         }
+        set_ui.connected()
     },
     close: function (ev) {
         console.log('Disconnected')
@@ -342,12 +366,18 @@ var handlers = {
                 ]
             }))
         }
-        feedback('已断线, 3 秒后尝试重连')
-        setTimeout(function () {
-            feedback('正在尝试重连')
-            发起连接()
-        }, 3000)
-        
+        let 已有连接 = (名字 != '')
+        if (已有连接) {
+            feedback('已断线, 3 秒后尝试重连')
+            setTimeout(function () {
+                feedback('正在尝试重连')
+                发起连接()
+            }, 3000)
+        } else {
+            连接按钮.enable()
+            alert('连接失败')
+        }
+        set_ui.disconnected()
     },
     message: function (ev) {
         console.log(ev.data)
@@ -357,13 +387,21 @@ var handlers = {
 
 
 function init () {
-    发起连接()
-    切换频道('')
+    set_ui.disconnected()
     if ( Notification ) {
         Notification.requestPermission().then(function(result) {
             console.log(result);
         });
     }
+    localStorage.url = localStorage.url? localStorage.url: DEFAULT_URL
+    ws_url = localStorage.url
+    地址输入.value = ws_url
+    let update_url = function () {
+        localStorage.url = ws_url = 地址输入.value
+    }
+    地址输入.addEventListener('keyup', ev => update_url())
+    地址输入.addEventListener('change', ev => update_url())
+    连接按钮.addEventListener('click', ev => (发起连接(), 连接按钮.disable()))
     window.addEventListener('focus', ev => 占有焦点 = true)
     window.addEventListener('blur', ev => 占有焦点 = false)
     消息列表视图.addEventListener('scroll', function (ev) {
