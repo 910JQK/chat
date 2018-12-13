@@ -10,12 +10,15 @@ import websockets
 from functools import wraps
 from datetime import datetime
 from json.decoder import JSONDecodeError
+from concurrent.futures import ThreadPoolExecutor
+from database import 数据库操作
 
 
 侦听端口 = 8102
 随机名字长度 = 10
 默认频道 = '默认频道'
 默认频道主题 = 'default channel'
+db_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def log(text):
@@ -24,6 +27,10 @@ def log(text):
 
 def now():
     return datetime.now().isoformat(' ')
+
+
+async def 操作数据库(f):
+    await asyncio.get_event_loop().run_in_executor(db_executor, f)
 
 
 def 生成随机名字():
@@ -124,6 +131,29 @@ def 后台执行(操作):
     asyncio.create_task(操作)
 
 
+def 记录消息(消息, 频道):
+    需要记录 = ['说话', '通知']
+    class 记录内容:
+        def 说话(消息):
+            return {
+                '类型': '说话',
+                '频道': 频道,
+                '用户': 消息['内容']['谁'],
+                '内容': 消息['内容']['说了什么']
+            }
+        def 通知(消息):
+            return {
+                '类型': '通知',
+                '频道': 频道,
+                '用户': '',
+                '内容': 消息['内容']
+            }
+    def 存入记录():
+        数据库操作.加入记录(getattr(记录内容, 消息['类型'])(消息))
+    if 消息['类型'] in 需要记录:
+        后台执行(操作数据库(存入记录))
+
+
 def 广播(消息, 频道=None):
     if 频道 is not None:
         for 用户 in [ 用户列表[名字] for 名字 in 频道列表[频道].加入用户列表]:
@@ -131,6 +161,7 @@ def 广播(消息, 频道=None):
     else:
         for 用户 in 用户列表.values():
             后台执行(用户.发送消息(消息))
+    记录消息(消息, 频道)
     log(f"【{消息['类型']}】({频道}) {repr(消息['内容'])}")
 
 
