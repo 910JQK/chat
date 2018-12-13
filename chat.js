@@ -9,7 +9,7 @@ var 已加入频道表 = new Set()
 var 当前频道 = ''
 var 滚动位置 = {}
 var 占有焦点 = true
-var 图片大小上限 = 3*1024*1024
+const 图片大小上限 = 3*1024*1024
 
 
 function is_scrolled_to_bottom (view) {
@@ -302,12 +302,50 @@ function 改名 (新名字) {
 }
 
 
+function 加入频道 (频道) {
+    发送消息({ 命令: '加入频道', 频道: 频道 })
+}
+
+
+function 发起连接() {
+    socket = new WebSocket(WS_URL)
+    map(handlers, (event, handler) => socket.addEventListener(event, handler))
+}
+
+
 var handlers = {
     open: function (ev) {
         console.log('Connected')
+        if (名字) {
+            改名(名字)
+            map(
+                filter(已加入频道表, 频道 => 频道 != 当前频道),
+                频道 => 加入频道(频道)
+            )
+            if (当前频道) {
+                加入频道(当前频道)
+            }
+        }
     },
     close: function (ev) {
         console.log('Disconnected')
+        function feedback (text) {
+            渲染消息(create({
+                tag: 'message',
+                dataset: {
+                    消息类型: '反馈'
+                },
+                children: [
+                    { tag: 'info', textContent: text }
+                ]
+            }))
+        }
+        feedback('已断线, 3 秒后尝试重连')
+        setTimeout(function () {
+            feedback('正在尝试重连')
+            发起连接()
+        }, 3000)
+        
     },
     message: function (ev) {
         console.log(ev.data)
@@ -317,8 +355,7 @@ var handlers = {
 
 
 function init () {
-    socket = new WebSocket(WS_URL)
-    map(handlers, (event, handler) => socket.addEventListener(event, handler))
+    发起连接()
     切换频道('')
     if ( Notification ) {
         Notification.requestPermission().then(function(result) {
@@ -417,11 +454,7 @@ function init () {
             return create({
                 tag: 'a',
                 href: 'javascript:void(0)',
-                handlers: {
-                    click: ev => 发送消息(
-                        { 命令: '加入频道', 频道: 频道.名称 }
-                    )
-                },
+                handlers: { click: ev => 加入频道(频道.名称) },
                 children: [
                     { tag: 'item-label', textContent: 频道.名称 },
                     { tag: 'item-desc', textContent: 频道.主题 }
