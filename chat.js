@@ -325,6 +325,8 @@ var handlers = {
             if (当前频道) {
                 加入频道(当前频道)
             }
+            已加入频道表.clear()
+            切换按钮.disable()
         }
     },
     close: function (ev) {
