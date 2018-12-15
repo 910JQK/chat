@@ -134,10 +134,10 @@ var 如何处理消息 = [
             let 频道 = 消息.频道
             let 发图用户 = 消息.内容.谁
             let 图片 = 消息.内容.发了什么
-            let 格式 = 消息.内容.什么格式
+            //let 格式 = 消息.内容.什么格式
             let 颜色 = get_color(发图用户)
             let 图片地址 = URL.createObjectURL(
-                new Blob([decode(图片)], {type: 'image/${格式}'})
+                new Blob([decode(图片)]/*, {type: 'image/${格式}'}*/)
             )
             console.log(图片地址)
             渲染消息(create({
@@ -295,8 +295,8 @@ function 说话 (说了什么) {
 }
 
 
-function 发图 (数据, 格式) {
-    发送消息({ 命令: '发图', 图片: 数据, 格式: 格式, 频道: 当前频道 })
+function 发图 (数据/*, 格式*/) {
+    发送消息({ 命令: '发图', 图片: 数据, /*格式: 格式,*/ 频道: 当前频道 })
 }
 
 
@@ -447,10 +447,10 @@ function init () {
             选图提示.textContent = text
         }
         let 图片数据 = ''
-        let 文件格式 = 'png'
+        //let 文件格式 = 'png'
         文件输入.addEventListener('change', function (ev) {
             let f = 文件输入.files[0]
-            文件格式 = f.name.replace(/.*\.(...)$/,'$1').toLowerCase()
+            //文件格式 = f.name.replace(/.*\.(...)$/,'$1').toLowerCase()
             let reader = new FileReader()
             reader.addEventListener('load', function (ev) {
                 let data = ev.target.result
@@ -474,7 +474,7 @@ function init () {
             文件输入.value = ''
             选图对话框.hide()
             feedback('请选择要发送的图片, 最大 3M')
-            发图(图片数据, 文件格式)
+            发图(图片数据/*, 文件格式*/)
         })
     })()
     切换菜单 = popup_list(切换按钮, () => 已加入频道表, function (频道) {
