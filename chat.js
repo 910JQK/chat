@@ -260,6 +260,7 @@ function 切换频道 (频道) {
     频道提示.textContent = 当前频道 || '---'
     if (当前频道) {
         退出按钮.enable()
+        主题按钮.enable()
         选图按钮.enable()
         输入框.enable()
         inject_style('channel', create_style([
@@ -280,6 +281,7 @@ function 切换频道 (频道) {
     } else {
         切换按钮.disable()
         退出按钮.disable()
+        主题按钮.disable()
         选图按钮.disable()
         输入框.disable()
         inject_style('channel', create_style([]))
@@ -321,7 +323,9 @@ var set_ui = {
         创建按钮.disable()
         选图按钮.disable()
         退出按钮.disable()
-        加入按钮.disable()        
+        主题按钮.disable()
+        加入按钮.disable()
+        输入框.disable()
     },
     connected: function () {
         切换按钮.disable()
@@ -329,6 +333,7 @@ var set_ui = {
         创建按钮.enable()
         选图按钮.enable()
         退出按钮.enable()
+        主题按钮.enable()
         加入按钮.更新状态()
     }
 }
@@ -516,10 +521,18 @@ function init () {
     }
     退出按钮.addEventListener('click', function (ev) {
         if (this.is_enabled()) {
-            if (当前频道) {
-                发送消息({ 命令: '退出频道', 频道: 当前频道 })
-            }
+            发送消息({ 命令: '退出频道', 频道: 当前频道 })
         }
+    })
+    主题按钮.addEventListener('click', function (ev) {
+        if (this.is_enabled()) {
+            let 新主题 = prompt('请输入新的主题')
+            if (新主题 !== null) {
+                发送消息({
+                    命令: '更改主题', 频道名: 当前频道, 新主题: 新主题
+                })
+            }
+        }        
     })
     创建按钮.addEventListener('click', function (ev) {
         if (this.is_enabled()) {         
