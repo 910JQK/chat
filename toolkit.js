@@ -121,7 +121,10 @@ function create (data) {
             element[property] = value
         }
     })
-    map(data.children || [], child => element.appendChild(create(child)) )
+    map(
+        filter(data.children || [], x => x !== null),
+        child => element.appendChild(create(child))
+    )
     return element
 }
 

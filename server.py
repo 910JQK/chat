@@ -7,15 +7,17 @@ import random
 import asyncio
 import inspect
 import websockets
-from functools import wraps
 from datetime import datetime
 from json.decoder import JSONDecodeError
 from concurrent.futures import ThreadPoolExecutor
 from database import 数据库操作
+from message import *
+import message
 
 
 侦听端口 = 8102
 随机名字长度 = 10
+聊天记录请求上限 = 300
 db_executor = ThreadPoolExecutor(max_workers=1)
 
 
@@ -28,7 +30,7 @@ def now():
 
 
 async def 操作数据库(f):
-    await asyncio.get_event_loop().run_in_executor(db_executor, f)
+    return await asyncio.get_event_loop().run_in_executor(db_executor, f)
 
 
 def 生成随机名字():
@@ -125,6 +127,9 @@ class 用户:
 频道列表 = {}
 
 
+message.频道列表 = lambda: 频道列表
+
+
 def 后台执行(操作):
     asyncio.create_task(操作)
 
@@ -154,7 +159,7 @@ def 记录消息(消息, 频道):
                 '内容': 消息['内容']
             }
     def 存入记录():
-        数据库操作.加入记录(getattr(记录内容, 消息['类型'])(消息))
+        数据库操作.写入记录(getattr(记录内容, 消息['类型'])(消息))
     if 消息['类型'] in 需要记录:
         后台执行(操作数据库(存入记录))
 
@@ -170,147 +175,30 @@ def 广播(消息, 频道=None):
     log(f"【{消息['类型']}】({频道}) {repr(消息['内容'])}")
 
 
-def 封装消息(类型):
-    def decorator(f):
-        @wraps(f)
-        def g(*args, **kwargs):
-            消息内容 = f(*args, **kwargs)
-            return { '类型': 类型, '内容': 消息内容 }
-        return g
-    return decorator
-
-
-说话消息 = 封装消息('说话')
-发图消息 = 封装消息('发图')
-通知消息 = 封装消息('通知')
-反馈消息 = 封装消息('反馈')
-确认消息 = 封装消息('确认')
-频道列表消息 = 封装消息('频道列表')
-用户列表消息 = 封装消息('用户列表')
-名字更新消息 = 封装消息('名字更新')
-
-
-class 聊天:
-    @说话消息
-    def 说话(谁, 说了什么):
-        return {'谁': 谁, '说了什么': 说了什么}
-    @发图消息
-    def 发图(谁, 发了什么):
-        return {'谁': 谁, '发了什么': 发了什么}
-
-
-class 通知:
-    @通知消息
-    def 新用户加入(用户):
-        return f'用户 {用户.名字} 加入了聊天'
-    @通知消息
-    def 用户退出(用户):
-        return f'用户 {用户.名字} 退出了聊天'
-    @通知消息
-    def 用户改名(旧名字, 新名字):
-        return f'用户 {旧名字} 已改名为 {新名字}'
-    @通知消息
-    def 用户下线(用户):
-        return f'用户 {用户.名字} 已下线'
-    @通知消息
-    def 主题更改(用户, 新主题):
-        return f'讨论主题已被 {用户.名字} 更改为 {新主题}'
-
-
-class 反馈:
-    
-    @反馈消息
-    def 欢迎消息(新用户):
-        return f'欢迎来到聊天室! 你现在的名字是 {新用户.名字}'
-    
-    class 改名:
-        @反馈消息
-        def 重名(新名字):
-            return f'名字 {新名字} 正在被其它人使用'
-        @反馈消息
-        def 不合法(新名字):
-            return f'名字 {新名字} 不合法'
-        @反馈消息
-        def 缺少名字():
-            return f'请输入新的名字'
-        @反馈消息
-        def 成功():
-            return f'名字更改成功'
-
-    class 聊天:
-        @反馈消息
-        def 什么也没说():
-            return f'请输入说话内容'
-        @反馈消息
-        def 图片不合法():
-            return f'上传的图片不合法'
-
-    class 频道:
-        @反馈消息
-        def 已存在(频道):
-            return f'频道已存在: {频道} '
-        @反馈消息
-        def 不存在(频道):
-            return f'频道不存在: {频道}'
-        @反馈消息
-        def 已加入(频道):
-            return f'您已经加入了频道: {频道}'
-        @反馈消息
-        def 未加入(频道):
-            return f'您并未加入频道: {频道}'
-        @反馈消息
-        def 创建成功(频道):
-            return f'成功创建频道: {频道}'
-        @反馈消息
-        def 更改成功():
-            return f'主题更改成功'
-        @反馈消息
-        def 缺少名称(频道):
-            return f'请输入频道名称'
-
-
-class 消息确认:
-    @确认消息
-    def 收到说话消息(序号):
-        return {'确认什么': '收到说话消息', '序号': 序号}
-    @确认消息
-    def 收到图片消息(序号):
-        return {'确认什么': '收到图片消息', '序号': 序号}
-    @确认消息
-    def 创建成功(频道):
-        return {'确认什么': '成功创建频道', '频道': 频道}
-    @确认消息
-    def 退出成功(频道):
-        return {'确认什么': '成功退出频道', '频道': 频道}
-    @确认消息
-    def 更改成功(频道, 新主题):
-        return {'确认什么': '成功更改主题', '新主题': 新主题, '频道': 频道}
-    @确认消息
-    def 加入成功(频道):
-        return {
-            '确认什么': '成功加入频道',
-            '频道': 频道,
-            '主题': 频道列表[频道].主题,
-            '用户列表': list(频道列表[频道].加入用户列表)
-        }
-
-
-class 其它消息:
-    @频道列表消息
-    def 频道列表():
-        return [{'名称':c.频道名, '主题':c.主题} for c in 频道列表.values()]
-    @用户列表消息
-    def 用户列表(频道):
-        return list(频道列表[频道].加入用户列表)
-    @名字更新消息
-    def 名字更新(新名字):
-        return 新名字
-
-
 class 执行命令:
 
     async def 频道列表(用户):
         await 用户.发送消息(其它消息.频道列表())
+
+    async def 聊天记录(用户, 频道名, 数量):
+        try:
+            数量 = int(数量)
+        except ValueError:
+            return
+        if 数量 <= 0:
+            return
+        if 数量 > 聊天记录请求上限:
+            await 用户.发送消息(反馈.记录.请求过多(聊天记录请求上限))
+            return
+        if 频道列表.get(频道名) is None:
+            await 用户.发送消息(反馈.频道.不存在(频道名))
+            return
+        if 频道列表[频道名].不在里面(用户):
+            await 用户.发送消息(反馈.频道.未加入(频道名))
+            return
+        记录表 = await 操作数据库(lambda: 数据库操作.读取记录(频道名, 数量))
+        for 记录 in 记录表:
+            await 用户.发送消息(其它消息.聊天记录(频道名, 记录))
 
     async def 更改主题(用户, 频道名, 新主题):
         if 频道列表.get(频道名) is None:
