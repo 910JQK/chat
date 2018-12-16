@@ -37,14 +37,14 @@ class 数据库操作:
     def 写入记录(记录):
         聊天记录.create(时间=datetime.now(), **记录)
     def 读取记录(频道, 数量):
-        return list(
+        return list(reversed(
             聊天记录
             .select()
             .where(聊天记录.频道 == 频道)
             .order_by(聊天记录.时间.desc())
             .paginate(1, 数量)
             .execute()
-        )
+        ))
     def 添加频道(频道信息):
         频道.create(**频道信息)
     def 更改主题(频道名, 新主题):
