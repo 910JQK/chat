@@ -110,6 +110,8 @@ class 用户:
 
     def 改名(self, 新名字):
         旧名字 = self.名字
+        if 旧名字 == 新名字:
+            return
         self.名字 = 新名字
         用户列表[新名字] = 用户列表.pop(旧名字)
         for 频道 in self.加入频道列表:
