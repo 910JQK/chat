@@ -37,6 +37,8 @@ recv-time { margin-right: 0.3em; }
 say-name { margin-right: 0.4em;  }
 say-name { cursor: pointer; }
 say-name::after { content: ":" }
+say-content > a:not(:last-child) { margin-right: 0.3em; }
+say-content > a:not(:first-child) { margin-left: 0.3em; }
 message[data-消息类型=通知] { color: hsl(0, 0%, 15%) }
 message[data-消息类型=反馈] { font-weight: bold; }
 message[data-是否高亮=true] { background-color: hsl(60, 88%, 77%); }

@@ -1,3 +1,4 @@
+const URL_REGEX = /[-a-zA-Z0-9@:%_\+.~#?&//=]{2,256}\.[a-z]{2,4}\b(\/[-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi
 const DEFAULT_URL = 'ws://127.0.0.1:8102'
 const 图片大小上限 = 3*1024*1024
 
@@ -100,6 +101,44 @@ function 清空用户列表 () {
 }
 
 
+function 富文本化 (str) {
+    let scanned = map(str.split(' '), function(fragment) {
+        if ( fragment && fragment[0] == '@' ) {
+            return {
+                tag: 'a',
+                href: 'javascript:void(0)',
+                textContent: fragment,
+                handlers: { click: ev => 输入框.insert(fragment) }
+            }
+        } else if ( fragment.match(URL_REGEX) ) {
+            return {
+                tag: 'a',
+                href: fragment,
+                target: '_blank',
+                textContent: fragment
+            }
+        } else {
+            return fragment
+        }
+    })
+    let result = []
+    let latest = () => result[result.length-1]
+    let is_str = x => x.tag == 'span'
+    map(scanned, function (fragment) {
+        if ( typeof fragment == 'string' ) {
+            if ( result.length == 0 || !is_str(latest()) ) {
+                result.push({ tag: 'span', textContent: fragment })
+            } else {
+                latest().textContent += ' ' + fragment
+            }
+        } else {
+            result.push(fragment)
+        }
+    })
+    return result
+}
+
+
 let 消息视图 = {
     反馈: function (参数) {
         // ([收到时间], 内容)
@@ -146,7 +185,7 @@ let 消息视图 = {
                 { tag: 'say-name', textContent: 参数.谁,
                   style: { color: 颜色 },
                   handlers: { click: ev => 输入框.insert(`@${参数.谁}`) } },
-                { tag: 'say-content', textContent: 参数.说了什么 }
+                { tag: 'say-content', children: 富文本化(参数.说了什么) }
             ]
         })
     },
