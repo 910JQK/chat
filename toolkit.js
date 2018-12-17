@@ -285,6 +285,7 @@ function decode(str) {
 
 Object.prototype.has = function (key) { return this.hasOwnProperty(key) }
 HTMLElement.prototype.hide = function () { this.style.display = 'none' }
+HTMLElement.prototype.show = function (v) { this.style.display = v || '' }
 HTMLElement.prototype.toggle = function () {
     if ( this.style.display == 'none' ) {
         this.style.display = ''

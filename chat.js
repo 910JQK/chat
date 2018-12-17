@@ -5,6 +5,7 @@ const 图片大小上限 = 3*1024*1024
 var ws_url = ''
 var socket = null
 var 名字 = ''
+var 登入状态 = '未登入'
 var 频道列表 = []
 var 用户列表 = {}
 var 已加入频道表 = new Set()
@@ -57,6 +58,12 @@ function notify (title, content) {
 function 更新名字 (新名字) {
     名字 = 新名字
     名字提示.textContent = 新名字
+}
+
+
+function 更新登入状态 (状态) {
+    登入状态 = 状态
+    设定界面.登入状态更新()
 }
 
 
@@ -198,6 +205,27 @@ let 消息视图 = {
                 })
             ], 基本视图[记录.类型]().children)
         })
+    },
+    激活入口: function () {
+        return create({
+            tag: 'message',
+            dataset: { 消息类型: '反馈' },
+            children: [
+                {
+                    tag: 'a',
+                    href: 'javascript:void(0)',
+                    textContent: '收到激活令牌后点击这里激活帐号',
+                    handlers: {
+                        click: function (ev) {
+                            let 令牌值 = prompt('请输入收到的激活令牌')
+                            if (令牌值 != null && 令牌值 != '') {
+                                激活(令牌值)
+                            }
+                        }
+                    }
+                }
+            ]
+        })
     }
 }
 
@@ -271,7 +299,8 @@ let 如何处理消息 = [
     {
         类型: one_of('名字更新'),
         执行动作: function (消息) {
-            更新名字(消息.内容)
+            更新名字(消息.内容.新名字)
+            更新登入状态(消息.内容.登入状态)
         }
     },
     {
@@ -304,6 +333,9 @@ let 如何处理消息 = [
                         内容: `已退出频道: ${频道}`                      
                     }))
                     设定界面.加入或退出频道()
+                },
+                成功注册: function () {
+                    渲染消息(消息视图.激活入口())
                 }
             }
             if( 确认动作.has(消息.内容.确认什么) ) {
@@ -388,6 +420,21 @@ function 发图 (数据) {
 
 function 改名 (新名字) {
     发送消息({ 命令: '改名', 新名字: 新名字 })
+}
+
+
+function 登入 (登入的名字, 密码) {
+    发送消息({ 命令: '登入', 名字: 登入的名字, 密码: 密码 })
+}
+
+
+function 注册 (邮箱, 密码) {
+    发送消息({ 命令: '注册', 邮箱: 邮箱, 密码: 密码 })
+}
+
+
+function 激活 (令牌值) {
+    发送消息({ 命令: '激活', 令牌值: 令牌值 })
 }
 
 
@@ -571,6 +618,32 @@ let 界面事件绑定 = {
             }
         }
     },
+    登入按钮: {
+        click: function (ev) {
+            if (this.is_enabled()) {
+                let 帐号 = prompt('请输入要登录的帐号的名字')
+                if (帐号 != null && 帐号 != '') {
+                    let 密码 = prompt(`请输入帐号 ${帐号} 的密码`)
+                    if (密码 != null && 密码 != '') {
+                        登入(帐号, 密码)
+                    }
+                }
+            }
+        }
+    },
+    注册按钮: {
+        click: function (ev) {
+            if (this.is_enabled()) {
+                let 邮箱 = prompt('请输入要使用的 Email 地址')
+                if (邮箱 != null && 邮箱 != '') {
+                    let 密码 = prompt('请设定密码')
+                    if (密码 != null && 密码 != '') {
+                        注册(邮箱, 密码)
+                    }
+                }
+            }
+        }
+    },
     选图按钮: {
         click: function (ev) {
             if (this.is_enabled()) {
@@ -652,8 +725,10 @@ function 存在未加入频道 () {
 
 let 设定界面 = {
     未连线: function () {
-        切换按钮.disable()
+        切换按钮.disable()        
         改名按钮.disable()
+        登入按钮.disable()
+        注册按钮.disable()
         创建按钮.disable()
         选图按钮.disable()
         退出按钮.disable()
@@ -665,11 +740,24 @@ let 设定界面 = {
     已连线: function () {
         切换按钮.disable()
         改名按钮.enable()
+        登入按钮.enable()
+        注册按钮.enable()
         创建按钮.enable()
         选图按钮.enable()
         退出按钮.enable()
         记录按钮.enable()
         主题按钮.enable()
+    },
+    登入状态更新: function () {
+        if (登入状态 == '已登入') {
+            注册按钮.hide()
+            登入按钮.textContent = '切换帐号'
+            名字提示.style.fontWeight = 'bold'
+        } else {
+            注册按钮.show()
+            登入按钮.textContent = '登录'
+            名字提示.style.fontWeight = 'inherit'
+        }
     },
     频道表变动: function () {
         if (存在未加入频道()) {
