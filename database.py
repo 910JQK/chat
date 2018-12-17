@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 
+import sys
 from utils import *
 from peewee import *
 from functools import wraps
@@ -140,21 +141,27 @@ class 数据库操作:
         else:
             return False
 
-    def 请求重置(名字):
+    def 请求重置(名字, 邮箱):
         信息 = 数据库操作.名字信息(名字)
-        if 信息['注册状态'] == '未注册':
-            return False
+        if 信息['激活状态'] == '未激活':
+            return { '结果': '失败', '失败原因': '不存在或未激活' }
         else:
-            数据库操作.生成令牌(名字, '密码重置')
-            return True
+            邮箱 = 邮箱.lower()
+            u = 用户.get(用户.名字 == 名字)
+            if u.邮箱 == 邮箱:
+                数据库操作.生成令牌(名字, '密码重置')
+                return { '结果': '成功' }
+            else:
+                return { '结果': '失败', '失败原因': '邮箱错误' }
 
     def 重置密码(名字, 令牌值, 新密码):
         信息 = 数据库操作.名字信息(名字)
-        if 信息['注册状态'] == '未注册':
+        if 信息['激活状态'] == '未激活':
             return False
         u = 用户.get(用户.名字 == 名字)
         if 数据库操作.检验令牌(名字, 令牌值):
-            u.密码 = pw_hash(名字, 令牌值)
+            u.密码 = pw_hash(名字, 新密码)
+            u.save()
             return True
         else:
             return False
@@ -173,6 +180,7 @@ class 数据库操作:
             subject = f'聊天室: {名字} 的 {类型}令牌',
             content = f'您的令牌是: {令牌值}'
         )
+        print(f'Debug: 生成令牌 {令牌值}', file=sys.stderr)
 
     def 检验令牌(名字, 令牌值):
         u = 用户.get(用户.名字 == 名字)

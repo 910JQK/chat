@@ -210,22 +210,42 @@ let 消息视图 = {
         return create({
             tag: 'message',
             dataset: { 消息类型: '反馈' },
-            children: [
-                {
-                    tag: 'a',
-                    href: 'javascript:void(0)',
-                    textContent: '收到激活令牌后点击这里激活帐号',
-                    handlers: {
-                        click: function (ev) {
-                            let 令牌值 = prompt('请输入收到的激活令牌')
-                            if (令牌值 != null && 令牌值 != '') {
-                                激活(令牌值)
+            children: [{
+                tag: 'a',
+                href: 'javascript:void(0)',
+                textContent: '收到激活令牌后点击这里激活帐号',
+                handlers: {
+                    click: function (ev) {
+                        let 令牌值 = prompt('请输入收到的激活令牌')
+                        if (令牌值 != null && 令牌值 != '') {
+                            激活(令牌值)
+                        }
+                    }
+                }
+            }]
+        })
+    },
+    重置入口: function (重置用户) {
+        return create({
+            tag: 'message',
+            dataset: { 消息类型: '反馈' },
+            children: [{
+                tag: 'a',
+                href: 'javascript:void(0)',
+                textContent: '收到密码重置令牌后点击这里重置密码',
+                handlers: {
+                    click: function (ev) {
+                        let 令牌值 = prompt('请输入收到的密码重置令牌')
+                        if (令牌值 != null && 令牌值 != '') {
+                            let 新密码 = prompt('请输入新的密码')
+                            if (新密码 != null && 新密码 != '') {
+                                重置密码(重置用户, 令牌值, 新密码)
                             }
                         }
                     }
                 }
-            ]
-        })
+            }]
+        })        
     }
 }
 
@@ -336,6 +356,9 @@ let 如何处理消息 = [
                 },
                 成功注册: function () {
                     渲染消息(消息视图.激活入口())
+                },
+                成功请求密码重置: function () {
+                    渲染消息(消息视图.重置入口(消息.内容.重置谁))
                 }
             }
             if( 确认动作.has(消息.内容.确认什么) ) {
@@ -435,6 +458,17 @@ function 注册 (邮箱, 密码) {
 
 function 激活 (令牌值) {
     发送消息({ 命令: '激活', 令牌值: 令牌值 })
+}
+
+
+function 请求重置密码 (重置用户, 邮箱) {
+    发送消息({ 命令: '请求重置密码', 名字: 重置用户, 邮箱: 邮箱 })
+}
+
+
+function 重置密码 (重置用户, 令牌值, 新密码) {
+    发送消息({ 命令: '重置密码',
+               名字: 重置用户, 令牌值: 令牌值, 新密码: 新密码 })
 }
 
 
@@ -709,7 +743,20 @@ let 界面事件绑定 = {
                 }
             }
         }
-    } 
+    },
+    重置按钮: {
+        click: function (ev) {
+            if (this.is_enabled()) {
+                let 重置用户 = prompt('请输入要重置密码的帐号名')
+                if ( 重置用户 != null && 重置用户 != '' ) {
+                    let 邮箱 = prompt('请输入注册该帐号时所用的邮箱')
+                    if ( 邮箱 != null && 邮箱 != '' ) {
+                        请求重置密码(重置用户, 邮箱)
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -729,6 +776,7 @@ let 设定界面 = {
         改名按钮.disable()
         登入按钮.disable()
         注册按钮.disable()
+        重置按钮.disable()
         创建按钮.disable()
         选图按钮.disable()
         退出按钮.disable()
@@ -742,6 +790,7 @@ let 设定界面 = {
         改名按钮.enable()
         登入按钮.enable()
         注册按钮.enable()
+        重置按钮.enable()
         创建按钮.enable()
         选图按钮.enable()
         退出按钮.enable()
@@ -751,10 +800,12 @@ let 设定界面 = {
     登入状态更新: function () {
         if (登入状态 == '已登入') {
             注册按钮.hide()
+            重置按钮.hide()
             登入按钮.textContent = '切换帐号'
             名字提示.style.fontWeight = 'bold'
         } else {
             注册按钮.show()
+            重置按钮.show()
             登入按钮.textContent = '登录'
             名字提示.style.fontWeight = 'inherit'
         }
