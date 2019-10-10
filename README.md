@@ -1,7 +1,11 @@
-# 簡易聊天室（實驗品）
+# Simple IRC-like Online Chat Demo Implementation
 
-首次測試請先执行 `database.py` 以創建資料庫. 每次資料庫結構更新需要刪除 `data.db` 之後重新創建資料庫.
+## Run
 
-每次測試時先执行 `server.py`, 再從瀏覧器打開 `index.html`.
+Before starting the server, execute `database.py` to create a database. 
 
-發送激活郵件需要安裝 SMTP Server, 比如 `opensmtpd`.
+To start the server, just execute `server.py`.
+
+To start the client, open `index.html` in a modern browser.
+
+To enable activation email sending, start `opensmtpd` or other SMTP server.
