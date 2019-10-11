@@ -1,5 +1,9 @@
 # Simple IRC-like Online Chat Demo Implementation
 
+## Screenshot
+
+![screenshot](screenshot.png)
+
 ## Run
 
 Before starting the server, execute `database.py` to create a database. 
